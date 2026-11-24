@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.aws/
+
+# build / test output
+dist/
+*.zip
+*.crx
+test-results/
+playwright-report/
+coverage/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

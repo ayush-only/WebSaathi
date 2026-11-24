@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "WebSaathi — AI Web Companion",
+  "short_name": "WebSaathi",
+  "version": "0.1.0",
+  "description": "Guides non-technical users through official Indian portals step by step, in English, Hindi and Kannada. Stops for passwords, OTPs, CAPTCHAs and payments.",
+  "minimum_chrome_version": "116",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "action": {
+    "default_title": "Open WebSaathi",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png" }
+  },
+  "side_panel": { "default_path": "sidepanel/sidepanel.html" },
+  "background": { "service_worker": "background/service-worker.js" },
+  "permissions": ["sidePanel", "storage", "scripting"],
+  "host_permissions": [
+    "https://www.irctc.co.in/*",
+    "https://railmadad.indianrailways.gov.in/*",
+    "https://consumerhelpline.gov.in/*",
+    "https://www.consumerhelpline.gov.in/*",
+    "https://pgportal.gov.in/*",
+    "https://www.pgportal.gov.in/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.irctc.co.in/*",
+        "https://railmadad.indianrailways.gov.in/*",
+        "https://consumerhelpline.gov.in/*",
+        "https://www.consumerhelpline.gov.in/*",
+        "https://pgportal.gov.in/*",
+        "https://www.pgportal.gov.in/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": ["shared/registry.js", "shared/schema.js", "shared/redact.js", "shared/safety.js", "content/content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'self'" }
+}

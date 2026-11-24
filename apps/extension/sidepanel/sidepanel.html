@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WebSaathi</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img src="../icons/icon48.png" alt="" width="34" height="34">
+      <div>
+        <div class="brand-name">WebSaathi</div>
+        <button type="button" id="engine-badge" class="badge badge-local" aria-describedby="engine-hint">Local Demo Mode</button>
+      </div>
+    </div>
+    <div class="top-controls">
+      <label class="visually-hidden" for="lang">Language</label>
+      <select id="lang" aria-label="Language / भाषा / ಭಾಷೆ">
+        <option value="en">English</option>
+        <option value="hi">हिन्दी</option>
+        <option value="kn">ಕನ್ನಡ</option>
+      </select>
+      <button type="button" id="voice-toggle" class="chip" aria-pressed="false" data-i18n="voiceOff">Read aloud: off</button>
+    </div>
+  </header>
+  <p id="engine-hint" class="engine-hint" data-i18n="localDemoHint">Using built-in rules (no AI server connected)</p>
+
+  <div id="banner" class="banner" role="alert" hidden></div>
+
+  <main id="main" tabindex="-1">
+    <!-- HOME -->
+    <section id="screen-home" aria-labelledby="welcome">
+      <h1 id="welcome" data-i18n="welcome">Namaste! What would you like to do today?</h1>
+      <p class="tagline" data-i18n="tagline"></p>
+      <form id="intent-form" class="intent" autocomplete="off">
+        <label for="intent" class="visually-hidden" data-i18n="yourAnswer">Your answer</label>
+        <textarea id="intent" rows="2" data-i18n-placeholder="inputPlaceholder"></textarea>
+        <div class="row">
+          <button type="button" class="btn btn-mic" id="intent-mic" data-mic-for="intent"><span aria-hidden="true">🎤</span> <span data-i18n="speak">Speak</span></button>
+          <button type="submit" class="btn btn-primary" data-i18n="go">Go</button>
+        </div>
+      </form>
+      <p id="intent-msg" class="msg" role="status" aria-live="polite"></p>
+
+      <h2 class="small-h" data-i18n="quickTasks">Or choose a task</h2>
+      <div class="tasks">
+        <button type="button" class="task" data-portal="irctc"><span aria-hidden="true">🚆</span><span data-i18n="taskTrain"></span></button>
+        <button type="button" class="task" data-portal="railmadad"><span aria-hidden="true">🛎️</span><span data-i18n="taskRail"></span></button>
+        <button type="button" class="task" data-portal="nch"><span aria-hidden="true">🧾</span><span data-i18n="taskConsumer"></span></button>
+        <button type="button" class="task" data-portal="cpgrams"><span aria-hidden="true">🏛️</span><span data-i18n="taskGovt"></span></button>
+        <button type="button" class="task task-demo" data-portal="demo"><span aria-hidden="true">🧪</span><span data-i18n="taskDemo"></span></button>
+      </div>
+      <button type="button" id="help-page" class="btn btn-secondary wide" data-i18n="helpThisPage">Help me on this page</button>
+    </section>
+
+    <!-- ROUTE CONFIRMATION -->
+    <section id="screen-route" hidden aria-labelledby="route-title">
+      <div class="card card-verified">
+        <p class="eyebrow"><span aria-hidden="true">✅</span> <span data-i18n="officialSite">Official website</span></p>
+        <h1 id="route-title"></h1>
+        <p class="domain" id="route-domain"></p>
+        <p id="route-purpose"></p>
+        <p class="note" data-i18n="verifiedNote"></p>
+        <div class="row">
+          <button type="button" class="btn btn-primary" id="route-open" data-i18n="openSite">Open official site</button>
+          <button type="button" class="btn btn-secondary" id="route-cancel" data-i18n="cancel">Cancel</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SESSION -->
+    <section id="screen-session" hidden aria-labelledby="site-name">
+      <div class="site">
+        <h1 id="site-name" class="site-name"></h1>
+        <p id="site-policy" class="policy"></p>
+      </div>
+      <div class="modes" role="radiogroup" aria-label="Mode">
+        <button type="button" role="radio" class="mode" data-mode="guide" aria-checked="true">
+          <strong data-i18n="modeGuide">Show me</strong><span data-i18n="modeGuideSub"></span></button>
+        <button type="button" role="radio" class="mode" data-mode="assist" aria-checked="false">
+          <strong data-i18n="modeAssist">Help me fill</strong><span data-i18n="modeAssistSub"></span></button>
+      </div>
+      <div class="progress" aria-live="polite">
+        <div class="progress-text" id="progress-text"></div>
+        <div class="bar" role="progressbar" aria-valuemin="0" id="progress-bar"><div class="bar-fill" id="progress-fill"></div></div>
+      </div>
+      <div id="card" class="card" aria-live="polite"></div>
+      <div class="controls">
+        <button type="button" class="btn btn-small" id="ctl-pause" data-i18n="pause">Pause</button>
+        <button type="button" class="btn btn-small" id="ctl-repeat" data-i18n="repeat">Repeat</button>
+        <button type="button" class="btn btn-small" id="ctl-undo" data-i18n="undo" disabled>Undo last fill</button>
+        <button type="button" class="btn btn-small btn-stop" id="ctl-stop" data-i18n="stop">Stop</button>
+      </div>
+      <details class="done-list">
+        <summary data-i18n="completed">Completed steps</summary>
+        <ol id="completed"></ol>
+      </details>
+    </section>
+
+    <!-- UNSUPPORTED -->
+    <section id="screen-unsupported" hidden>
+      <div class="card">
+        <h1 data-i18n="unsupported">WebSaathi cannot help on this website yet.</h1>
+        <p data-i18n="unsupportedHint"></p>
+        <button type="button" class="btn btn-secondary" data-go-home data-i18n="back">Back</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">Prototype for wHACKiest 2026 · WebSaathi never types passwords, OTPs, PINs or CAPTCHAs, and never presses submit or pay.</footer>
+
+  <script src="../shared/i18n.js"></script>
+  <script src="../shared/registry.js"></script>
+  <script src="../shared/schema.js"></script>
+  <script src="../shared/redact.js"></script>
+  <script src="../shared/safety.js"></script>
+  <script src="../shared/errors.js"></script>
+  <script src="../shared/planner.js"></script>
+  <script src="api.js"></script>
+  <script src="voice.js"></script>
+  <script src="sidepanel.js"></script>
+</body>
+</html>

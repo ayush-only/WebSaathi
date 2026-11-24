@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WebSaathi Grievance Demo — practice form (not a government website)</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="demo-notice" role="note">
+    <strong>DEMO / PRACTICE ENVIRONMENT.</strong>
+    This is the <em>WebSaathi Grievance Demo</em>, running on your own computer. It is <strong>not</strong> a government
+    or company website. Use fictional data only — nothing you type is sent anywhere.
+  </div>
+
+  <header class="site-head">
+    <div class="logo" aria-hidden="true">🧪</div>
+    <div>
+      <p class="kicker">WebSaathi practice portal</p>
+      <h1>Register a consumer complaint (demo)</h1>
+    </div>
+  </header>
+
+  <main>
+    <!-- Step 1: complaint details -->
+    <section id="step-details" aria-labelledby="details-title">
+      <h2 id="details-title">Step 1 of 2 · Complaint details</h2>
+      <p class="hint">Fields marked * are mandatory.</p>
+      <p id="form-summary" class="summary" role="alert" hidden></p>
+
+      <form id="complaint-form" novalidate>
+        <div class="field">
+          <label for="name">Complainant name *</label>
+          <input id="name" name="complainantName" type="text" autocomplete="name" required aria-describedby="name-error">
+          <p id="name-error" class="field-error" role="alert"></p>
+        </div>
+
+        <div class="field">
+          <label for="email">Email address *</label>
+          <input id="email" name="email" type="email" autocomplete="email" required aria-describedby="email-error">
+          <p id="email-error" class="field-error" role="alert"></p>
+        </div>
+
+        <div class="field">
+          <label for="category">Complaint category *</label>
+          <select id="category" name="category" required aria-describedby="category-error">
+            <option value="">— Select —</option>
+            <option value="ecommerce">E-commerce / online shopping</option>
+            <option value="banking">Banking</option>
+            <option value="telecom">Telecom / mobile</option>
+            <option value="electricity">Electricity</option>
+            <option value="other">Other</option>
+          </select>
+          <p id="category-error" class="field-error" role="alert"></p>
+        </div>
+
+        <div class="field">
+          <label for="company">Company name *</label>
+          <input id="company" name="company" type="text" required aria-describedby="company-error" placeholder="e.g. Example Retail Pvt Ltd">
+          <p id="company-error" class="field-error" role="alert"></p>
+        </div>
+
+        <div class="field">
+          <label for="description">Describe your complaint *</label>
+          <textarea id="description" name="description" rows="4" required minlength="20" aria-describedby="description-help description-error"></textarea>
+          <p id="description-help" class="help">At least 20 characters. Say what happened and when.</p>
+          <p id="description-error" class="field-error" role="alert"></p>
+        </div>
+
+        <fieldset class="field" aria-describedby="resolution-error">
+          <legend>Requested resolution *</legend>
+          <label class="opt"><input type="radio" name="resolution" value="refund" required> Refund</label>
+          <label class="opt"><input type="radio" name="resolution" value="replacement"> Replacement</label>
+          <label class="opt"><input type="radio" name="resolution" value="repair"> Repair</label>
+          <p id="resolution-error" class="field-error" role="alert"></p>
+        </fieldset>
+
+        <div class="field">
+          <label for="document">Supporting document (optional, max 200KB)</label>
+          <input id="document" name="document" type="file" accept=".pdf,.jpg,.jpeg,.png" aria-describedby="document-error">
+          <p id="document-error" class="field-error" role="alert"></p>
+        </div>
+
+        <div class="field">
+          <label class="opt"><input id="consent" name="consent" type="checkbox" required aria-describedby="consent-error">
+            I confirm that the details above are true (demo).</label>
+          <p id="consent-error" class="field-error" role="alert"></p>
+        </div>
+
+        <button type="submit" class="primary">Continue to verification</button>
+      </form>
+    </section>
+
+    <!-- Step 2: simulated sensitive step -->
+    <section id="step-otp" aria-labelledby="otp-title" hidden>
+      <h2 id="otp-title">Step 2 of 2 · Verify your mobile number</h2>
+      <p class="hint">Simulated sensitive step. In this demo, any 6 digits work. On a real site you would receive an OTP by SMS —
+        <strong>never share it with anyone.</strong></p>
+      <form id="otp-form" novalidate>
+        <div class="field">
+          <label for="otp">Enter the 6-digit OTP *</label>
+          <input id="otp" name="otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required aria-describedby="otp-error">
+          <p id="otp-error" class="field-error" role="alert"></p>
+        </div>
+        <button type="submit" class="primary">Submit complaint</button>
+      </form>
+    </section>
+
+    <!-- Step 3: done -->
+    <section id="step-done" hidden aria-labelledby="done-title">
+      <h2 id="done-title">Demo complaint recorded on this page only</h2>
+      <p>Reference: <strong id="ref"></strong></p>
+      <p>Nothing was sent to any company or authority. Reload the page to practise again.</p>
+    </section>
+  </main>
+
+  <footer class="foot">WebSaathi Grievance Demo · fictional practice environment for wHACKiest 2026 · not affiliated with any government body.</footer>
+  <script src="app.js"></script>
+</body>
+</html>

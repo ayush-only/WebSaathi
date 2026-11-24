@@ -1,0 +1,7 @@
+{
+  "name": "@websaathi/demo-portal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WebSaathi Grievance Demo — clearly labelled local practice form",
+  "scripts": { "start": "node server.js" }
+}
