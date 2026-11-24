@@ -4,6 +4,7 @@
   "private": true,
   "description": "WebSaathi — AI web companion for non-technical users (wHACKiest 2026, Track 02: Beyond the Browser)",
   "scripts": {
+    "postinstall": "npm --prefix apps/backend install --no-audit --no-fund",
     "demo": "node apps/demo-portal/server.js",
     "backend": "node apps/backend/src/server.js",
     "check": "node scripts/check.js",

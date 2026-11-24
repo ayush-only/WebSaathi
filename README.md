@@ -191,7 +191,7 @@ Full script with talking points: [docs/demo-guide.md](docs/demo-guide.md).
 ## Testing
 
 ```bash
-npm install                 # dev tools: eslint, playwright-core (no browser download)
+npm install                 # dev tools (eslint, playwright-core — no browser download) + backend deps
 npm run check               # syntax of every file, manifest + permissions, secret scan
 npm run lint                # ESLint
 npm test                    # unit tests (safety, registry, planner, errors, redaction, backend)
