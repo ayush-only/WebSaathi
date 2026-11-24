@@ -17,7 +17,7 @@ WebSaathi is a desktop Chrome extension that sits beside the user like a patient
   <img src="docs/screenshots/07-human-handoff.png" width="260" alt="Human handoff screen at the OTP step">
 </p>
 
-*Screenshots captured from the running extension in this repository (Local Demo Mode).*
+*Screenshots captured from the running extension in this repository (Local Demo Mode).UI will be improved soon*
 
 ---
 
