@@ -67,3 +67,17 @@ Private travel sites use `policy: 'assist'`; government and railway sites stay g
 
 **Hard limits in `safety.js`:** `CLICK_ELEMENT` is allowed only on `assist` sites, only after confirmation, only for buttons labelled Search or Apply, and any label containing pay, OTP, password, UPI, card, net banking, wallet, book now, continue, proceed, confirm, submit, cancel or log in is refused. Sensitive fields (password, OTP, card, ID numbers) are always a human hand-off. `fill()` re-validates in the page right before writing.
 
+### Agent mode: any other website
+
+For a site that is not in the registry the user types or says a goal and presses **Help me on this page**. Chrome then asks for permission for that one site (`optional_host_permissions: https://*/*`, requested at runtime), the content script is injected and switched on with `WS_SET_AGENT`, and WebSaathi works **on that site only** until the user leaves it. Until then the content script is inert: it answers only `WS_PING` and `WS_SET_AGENT`.
+
+Each step the content script sends the model (through the backend, after redaction) a compact view of the live page: the form fields and buttons, `clickables` (custom widgets such as a From card or a date tab), the visible text (first 1,500 characters), the booking stage, the offers shown, the result cards, and a short history of earlier actions. No field values. The model proposes **one** action from a fixed list; the backend and the extension both run it through `safety.js` before anything is shown.
+
+- **Fills** are never supplied by the model: a proposed fill becomes a question to the user, and typing happens only after the user's tap (`WS_FILL_ID` opens a custom widget, then types).
+- **Presses** (`CLICK_ELEMENT`) are limited to Search and Apply buttons, only after a tap. Pay, Book Now, Continue, Proceed, Confirm, Submit, Login and Cancel are refused whatever the model says.
+- **Refused sites:** plain http (except localhost), banking and payment hostnames. Government and IRCTC hosts are guide-only.
+- **Hand-offs** (passwords, OTP, card, UPI, ID numbers) stay on screen until the user says they did it; a page change or the model's next idea never skips one.
+- Without a model (Local Demo Mode) agent mode falls back to the rule-based walker and says so.
+
+Tests use a scripted stand-in for the model (`tests/browser/agent-mode.test.js`, `tests/unit/backend.test.js`); real Bedrock has not been exercised.
+

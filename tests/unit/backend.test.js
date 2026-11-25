@@ -75,3 +75,46 @@ test('interpret refuses secrets and only returns valid options', async () => {
     assert.equal((await (await post(base, '/api/interpret', { field: { kind: 'radio', label: 'Resolution', options: opts }, answer: 'paise wapas' })).json()).value, 'refund');
   });
 });
+
+test('agent mode: unknown sites only with the user switch; banking refused; the model can press only Search/Apply, never Pay', async () => {
+  const site = 'https://cabs.example.com';
+  const agentPage = {
+    origin: site, title: 'Cabs',
+    elements: [
+      { id: 'ws-1', kind: 'button', label: 'Search', text: 'Search', visible: true },
+      { id: 'ws-2', kind: 'button', label: 'Pay now', text: 'Pay now', visible: true }
+    ],
+    clickables: [{ id: 'ws-3', kind: 'clickable', label: 'Pickup', visible: true }],
+    pageText: 'Book a cab',
+    stage: 'form'
+  };
+  const out = (o) => JSON.stringify(Object.assign({ riskLevel: 'low', requiresConfirmation: true, expectedOrigin: site }, o));
+  const seen = [];
+  const outputs = [
+    out({ actionType: 'CLICK_ELEMENT', targetElementId: 'ws-1', instruction: 'Press Search' }),
+    out({ actionType: 'CLICK_ELEMENT', targetElementId: 'ws-2', instruction: 'Press Pay' }),
+    out({ actionType: 'ASK_QUESTION', targetElementId: 'ws-3', instruction: 'Where from?', requiresConfirmation: false }),
+    out({ actionType: 'FILL_FIELD', targetElementId: 'ws-3', instruction: 'x', proposedValue: 'Invented' })
+  ];
+  await withServer({ converse: async (system, user) => { seen.push(system + user); return outputs.shift(); } }, async (base) => {
+    // not switched on → refused; banking host → refused even when switched on
+    assert.equal((await post(base, '/api/next', { page: agentPage, session: {} })).status, 400);
+    assert.equal((await post(base, '/api/next', { page: Object.assign({}, agentPage, { origin: 'https://netbanking.example-bank.com' }), session: { agent: true } })).status, 400);
+    assert.equal((await post(base, '/api/next', { page: Object.assign({}, agentPage, { origin: 'http://cabs.example.com' }), session: { agent: true } })).status, 400, 'plain http is refused');
+
+    const go = async () => (await post(base, '/api/next', { page: agentPage, session: { agent: true, task: 'book a cab', history: ['ASK_QUESTION Pickup'] } })).json();
+    let r = await go();
+    assert.equal(r.action.actionType, 'CLICK_ELEMENT');
+    assert.equal(r.decision, 'needs-confirmation');
+    r = await go();
+    assert.equal(r.action.actionType, 'HIGHLIGHT_ELEMENT', 'Pay now is never pressed: downgraded to a look');
+    assert.equal(r.code, 'CLICK_NOT_ALLOWED');
+    r = await go();
+    assert.equal(r.action.actionType, 'ASK_QUESTION');
+    r = await go();
+    assert.equal(r.action.actionType, 'ASK_QUESTION', 'a model-proposed fill is turned into a question');
+    assert.equal(r.action.proposedValue, null);
+  });
+  assert.match(seen[0], /AGENT MODE/);
+  assert.match(seen[0], /History \(earlier actions\)/);
+});

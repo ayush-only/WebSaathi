@@ -28,3 +28,11 @@ AirSewa and NTES are **guide-only**. Private travel sites are **Assist**: every 
 ## Not production-ready yet
 
 Needed before real users: authenticated backend (per-install tokens), HTTPS deployment, persistent rate limiting and abuse monitoring, Bedrock guardrails, a formal privacy review/policy, native-speaker review of Hindi/Kannada, accessibility audit with real users (screen readers, low vision), and Chrome Web Store review.
+
+## Agent mode (any other website)
+
+- Off by default. The user states a goal, presses the button, and approves Chrome's permission prompt for that one site. Content scripts on unknown sites are inert until then.
+- Refused: plain http (except localhost), banking and payment hostnames (`agentPolicy` in `registry.js`, enforced again by the backend). Government and IRCTC hosts are guide-only.
+- The model only proposes; the deterministic gate decides. It can never supply values, URLs or selectors, and can press only Search/Apply after a tap.
+- Page text sent to the model is redacted first (Aadhaar-, card-, OTP-like numbers) and field values are never read. It is still the user's page content going to a model provider, which the user should know before switching it on.
+

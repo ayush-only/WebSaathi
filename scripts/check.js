@@ -57,12 +57,14 @@ const allowedPerms = ['sidePanel', 'storage', 'scripting'];
 const extra = (manifest.permissions || []).filter((p) => !allowedPerms.includes(p));
 if (extra.length) fail('unexpected permissions: ' + extra.join(', '));
 if ((manifest.host_permissions || []).some((h) => h === '<all_urls>' || h.startsWith('*://*') || h.includes('://*/'))) fail('host permissions must be scoped');
+const opt = manifest.optional_host_permissions || [];
+if (opt.some((h) => h !== 'https://*/*')) fail('optional host permissions may only be https://*/* (asked per site at runtime)');
 if (/'unsafe-eval'|unsafe-inline/.test(JSON.stringify(manifest.content_security_policy || {}))) fail('CSP must not allow unsafe-eval/inline');
 for (const f of js.filter((f) => f.startsWith(EXT))) {
   const src = fs.readFileSync(f, 'utf8');
   if (/\beval\s*\(|new Function\s*\(/.test(src)) fail('eval/new Function in ' + path.relative(ROOT, f));
 }
-ok('permissions: ' + manifest.permissions.join(', ') + ' + ' + manifest.host_permissions.length + ' scoped host patterns');
+ok('permissions: ' + manifest.permissions.join(', ') + ' + ' + manifest.host_permissions.length + ' scoped host patterns + optional https (per site, asked at runtime)');
 
 // 4. secrets
 const SECRET_RES = [/AKIA[0-9A-Z]{16}/, /aws_secret_access_key\s*=\s*\S{20,}/i, /sk_[a-f0-9]{40,}/, /ELEVENLABS_API_KEY=\S{10,}/];

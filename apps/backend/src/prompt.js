@@ -6,7 +6,7 @@
  */
 const LANG_NAMES = { en: 'English', hi: 'Hindi (Devanagari script)', kn: 'Kannada (Kannada script)' };
 
-function planSystemPrompt(lang) {
+function planSystemPrompt(lang, agent) {
   return [
     'You are the planning component of WebSaathi, a patient assistant that helps non-technical Indian users',
     'complete tasks on official websites one small step at a time. The user stays in control.',
@@ -31,7 +31,28 @@ function planSystemPrompt(lang) {
     '- If nothing useful remains, COMPLETE_GUIDANCE.',
     '- "instruction": at most 25 simple words, written in ' + (LANG_NAMES[lang] || LANG_NAMES.en) + '. No jargon.',
     '- "expectedOrigin" must be exactly page.origin.'
-  ].join('\n');
+  ].concat(agent ? agentRules() : []).join('\n');
+}
+
+/** Extra rules for "any other website" mode: the model reads the live page and helps with the user's own goal. */
+function agentRules() {
+  return [
+    '',
+    'AGENT MODE (any website). The user gave a goal in "Task". Help them reach it one small step at a time.',
+    '- You may also use CLICK_ELEMENT, with "requiresConfirmation": true, ONLY for a button whose text is exactly',
+    '  Search (or Search flights/buses/hotels/trains) or Apply (or Apply coupon/code). The user is asked first.',
+    '  Never press anything else. Never press Pay, Book Now, Continue, Proceed, Confirm, Submit, Login, Cancel.',
+    '- Besides "elements", the page has "clickables" (custom widgets such as a From card, a date card, a tab) which',
+    '  you may HIGHLIGHT_ELEMENT or ASK_QUESTION about. "pageText" is the visible text. "stage" is form, results,',
+    '  details or pay. "options" are result cards (price, times, stops). "offers" are coupons the page already shows.',
+    '- Work out what the goal needs and ask for it one thing at a time (for example from, to, date, travellers).',
+    '  Use ASK_QUESTION with the element where the answer goes. The user types the answer; you never invent it.',
+    '- On a results page, ask what matters (price, time, stops) before pointing at an option. The user chooses.',
+    '- When the page shows offers or a coupon box, ask if the user has a code; if not, explain the offers shown.',
+    '- On a payment or login step, or any sensitive element, answer HUMAN_HANDOFF. Never go past payment.',
+    '- Look at "history" (your earlier actions) and do not repeat one that did not change the page; try another',
+    '  element, or say what the user should do by hand with HIGHLIGHT_ELEMENT or WAIT_FOR_USER.'
+  ];
 }
 
 function planUserPrompt(page, session) {
@@ -39,6 +60,7 @@ function planUserPrompt(page, session) {
     'Task: ' + (session.task || '(help on the current page)'),
     'Mode: ' + (session.mode === 'assist' ? 'assist' : 'guide'),
     'Language: ' + (session.lang || 'en'),
+    'History (earlier actions): ' + JSON.stringify((session.history || []).slice(-6)),
     'Skipped ids: ' + JSON.stringify(session.skipped || []),
     'Already handed off ids: ' + JSON.stringify(session.handoffDone || []),
     '<untrusted_page_data>',

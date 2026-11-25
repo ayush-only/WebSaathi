@@ -278,5 +278,22 @@
     return new URL(portal.url).host;
   }
 
-  return { PORTALS, DEMO_PORT, routeIntent, getPortal, portalForOrigin, portalForUrl, checkNavigation, displayDomain, normalise };
+
+  /**
+   * "Any other website" (agent mode). Allowed only when the user switches it on for that site. Banking and payment
+   * hosts are refused outright; government hosts are guide-only; everything else is assist (every fill/press needs a tap).
+   */
+  const BLOCKED_HOST_RE = /(^|[.-])(bank|netbanking|sbi|hdfc|icici|axis|kotak|pnb|canara|idfc|yesbank|paytm|phonepe|gpay|razorpay|payu|billdesk|upi|pay|payment|payments|checkout|loan|loans|insurance|wallet|demat|zerodha|groww)([.-]|$)/i;
+  function agentPolicy(origin) {
+    let u;
+    try { u = new URL(origin); } catch (_) { return { ok: false, reason: 'INVALID_URL' }; }
+    const host = u.hostname.toLowerCase();
+    const local = host === 'localhost' || host === '127.0.0.1';
+    if (u.protocol !== 'https:' && !local) return { ok: false, reason: 'NOT_HTTPS' };
+    if (BLOCKED_HOST_RE.test(host)) return { ok: false, reason: 'BANKING_OR_PAYMENT' };
+    if (/(^|\.)(gov|nic)\.in$/.test(host) || /(^|\.)irctc\.co\.in$/.test(host)) return { ok: true, policy: 'guide-only' };
+    return { ok: true, policy: 'assist' };
+  }
+
+  return { agentPolicy, PORTALS, DEMO_PORT, routeIntent, getPortal, portalForOrigin, portalForUrl, checkNavigation, displayDomain, normalise };
 });

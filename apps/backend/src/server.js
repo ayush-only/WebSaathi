@@ -28,7 +28,7 @@ function createApp(deps) {
 
   const app = express();
   app.disable('x-powered-by');
-  app.use(express.json({ limit: '64kb' }));
+  app.use(express.json({ limit: '160kb' }));
 
   // CORS: only the WebSaathi extension (or localhost tools) may call this API from a browser.
   app.use((req, res, next) => {
@@ -74,15 +74,20 @@ function createApp(deps) {
     const page = redact.redactDeep(body.page || {});
     const session = body.session || {};
     const portal = registry.portalForOrigin(page.origin);
-    if (!portal) return res.status(400).json({ error: 'unsupported origin' });
+    const agent = !portal && session.agent === true ? registry.agentPolicy(page.origin) : null;
+    if (!portal && !(agent && agent.ok)) return res.status(400).json({ error: 'unsupported origin', reason: agent ? agent.reason : undefined });
     if (!Array.isArray(page.elements)) return res.status(400).json({ error: 'missing elements' });
-    page.policy = portal.policy; // the server decides the policy, not the client
+    const policy = portal ? portal.policy : agent.policy;
+    page.policy = policy; // the server decides the policy, not the client
+    if (page.pageText) page.pageText = String(page.pageText).slice(0, 1500);
+    for (const k of ['clickables', 'options', 'offers']) if (Array.isArray(page[k])) page[k] = page[k].slice(0, 40); else delete page[k];
 
     const lang = ['en', 'hi', 'kn'].includes(session.lang) ? session.lang : 'en';
     let text;
     try {
-      text = await d.converse(prompts.planSystemPrompt(lang), prompts.planUserPrompt(page, {
+      text = await d.converse(prompts.planSystemPrompt(lang, !!agent), prompts.planUserPrompt(page, {
         task: String(session.task || '').slice(0, 300), mode: session.mode, lang,
+        history: (session.history || []).slice(-6).map((h) => String(h).slice(0, 160)),
         skipped: (session.skipped || []).slice(0, 100), handoffDone: (session.handoffDone || []).slice(0, 100)
       }), 400);
     } catch (err) {
@@ -95,10 +100,10 @@ function createApp(deps) {
       // The model never supplies values; the user does.
       action = Object.assign({}, action, { actionType: 'ASK_QUESTION', proposedValue: null, requiresConfirmation: false });
     }
-    const elements = Object.fromEntries(page.elements.map((e) => [e.id, e]));
-    const v = safety.validateAction(action, { origin: page.origin, policy: portal.policy, elements, confirmed: false });
+    const elements = Object.fromEntries(page.elements.concat(page.clickables || []).map((e) => [e.id, e]));
+    const v = safety.validateAction(action, { origin: page.origin, policy, elements, confirmed: false });
     if (v.decision === 'block') return res.status(422).json({ error: 'action blocked by safety gate', code: v.code });
-    res.json({ action: v.action, decision: v.decision, source: 'bedrock', model: config.bedrock.modelId });
+    res.json({ action: v.action, decision: v.decision, code: v.code, source: 'bedrock', model: config.bedrock.modelId });
   });
 
   app.post('/api/interpret', async (req, res) => {

@@ -101,11 +101,14 @@
     try { const r = await send({ type: 'WS_PING' }); if (r && r.ok) return r; } catch (_) { /* not injected yet */ }
     try {
       await chrome.scripting.executeScript({ target: { tabId: st.tabId }, files: CONTENT_FILES });
+      if (st.agent && st.agent.tabId === st.tabId) await send({ type: 'WS_SET_AGENT' }); // a new page load forgets agent mode
       const r = await send({ type: 'WS_PING' });
       if (r && r.ok) return r;
     } catch (_) { /* page not ready or not permitted */ }
     return null;
   }
+
+  const originOf = (url) => { try { return new URL(url).origin; } catch (_) { return ''; } };
 
   async function refreshTab(event) {
     const tab = await activeTab();
@@ -115,8 +118,13 @@
     const portal = tab.url ? WS.registry.portalForUrl(tab.url) : null;
     const s = st.session;
 
+    if (!portal && s && s.agent && st.agent && st.agent.tabId === tab.id && tab.url && originOf(tab.url) === st.agent.origin) {
+      if (tab.status === 'complete') scheduleStep(400); // same site, new page: carry on with the same goal
+      return;
+    }
     if (!portal) {
       // Left a verified website, or opened a new tab / any other page: ask what the user wants to do.
+      if (st.agent && st.agent.tabId === tab.id) st.agent = null;
       if (s) {
         if (!switchedTab && event === 'updated') setBanner(t('leftOfficial'));
         endSession();
@@ -243,8 +251,55 @@
       case 'clarify': return showKinds(r.category ? r.category.label : null, r.options, said);
       case 'portal': return showRoute(r.portal);
       case 'unsupported': msg.textContent = t(r.topic === 'bank' ? 'unsupportedBank' : 'unsupportedOther'); return say(msg.textContent);
-      default: msg.textContent = t('noMatch'); return say(t('noMatch'));
+      default: return startAgent(said).then(() => { if (!st.session) { msg.textContent = msg.textContent || t('noMatch'); } });
     }
+  }
+
+
+  // ---------------------------------------------------------------- agent mode: any other website
+  function renderClick(d, field) {
+    const s = st.session;
+    const label = (field && (field.text || field.label)) || '';
+    s.current = { kind: 'confirm', fieldId: field ? field.id : null };
+    highlight(field ? field.id : null, '', 'guide');
+    setCard('card-confirm',
+      el('p', { class: 'eyebrow' }, '🔎 ' + t('confirmTitle')),
+      el('p', { class: 'instruction', id: 'pb-text' }, t('agentPressAsk', { label })),
+      el('div', { class: 'row' },
+        el('button', { type: 'button', class: 'btn btn-primary', id: 'confirm-yes', onclick: async () => {
+          const r = await sendSafe({ type: 'WS_CLICK_ID', id: field.id, confirmed: true });
+          s.current = null;
+          if (r && r.ok) { s.lastKey = ''; setTimeout(() => step(true), 900); return; }
+          setCard('card-error', el('p', { class: 'instruction' }, t('pbCantType')), el('p', { class: 'raw' }, r && r.code ? r.code : ''),
+            el('div', { class: 'row' }, el('button', { type: 'button', class: 'btn btn-secondary', onclick: () => { s.skipped.push(field.id); step(true); } }, t('pbNext'))));
+        } }, '✓ ' + t('agentYesPress')),
+        el('button', { type: 'button', class: 'btn btn-secondary', onclick: () => { s.skipped.push(field.id); s.current = null; s.lastKey = ''; step(true); } }, t('pbIPress'))));
+    $('#confirm-yes').focus();
+    say(t('agentPressAsk', { label }));
+  }
+
+  /** "Help me on this page" on a site that is not in the registry: ask permission, switch agent mode on for THIS site only. */
+  async function startAgent(goal) {
+    const msg = $('#intent-msg');
+    const tab = await activeTab();
+    if (!tab || !tab.url || !/^https?:/.test(tab.url)) { show('unsupported'); return; }
+    const origin = originOf(tab.url);
+    const ap = WS.registry.agentPolicy(origin);
+    if (!ap.ok) { msg.textContent = t(ap.reason === 'BANKING_OR_PAYMENT' ? 'agentBlocked' : 'unsupportedOther'); say(msg.textContent); return; }
+    if (!goal) { msg.textContent = t('agentNeedGoal'); say(msg.textContent); return; }
+    st.tabId = tab.id;
+    try {
+      const have = await chrome.permissions.contains({ origins: [origin + '/*'] });
+      if (!have && !(await chrome.permissions.request({ origins: [origin + '/*'] }))) { msg.textContent = t('agentDenied'); return; }
+    } catch (_) { /* host already granted by the manifest (local pages) */ }
+    st.agent = { tabId: tab.id, origin };
+    const ping = await ensureContent();
+    const on = ping ? await sendSafe({ type: 'WS_SET_AGENT' }) : null;
+    if (!on || !on.ok) { msg.textContent = t('notReady'); return; }
+    st.task = goal;
+    st.portal = null;
+    await startSession('assist', { agent: true });
+    if (!WS.api.health.ai) setBanner(t('agentNoAI'));
   }
 
   // ------------------------------------------------------------------ session
@@ -257,7 +312,7 @@
     stepTimer = setTimeout(() => step(false), ms || 300);
   }
 
-  async function startSession(mode) {
+  async function startSession(mode, opts) {
     const ping = await ensureContent();
     if (!ping || !ping.policy) { $('#intent-msg').textContent = t('notReady'); show('home'); return; }
     st.session = {
@@ -267,8 +322,10 @@
       tabId: st.tabId,
       skipped: [], handoffDone: [], explained: [], completed: [],
       paused: false, current: null, lastKey: '', scan: null, source: 'local', canUndo: false,
-      taskId: forcedTask || (st.taskCtx && st.taskCtx.task.id) || null, pbIndex: 0, skipChooser: false
+      taskId: forcedTask || (st.taskCtx && st.taskCtx.task.id) || null, pbIndex: 0, skipChooser: false,
+      agent: !!(opts && opts.agent), history: []
     };
+    if (st.session.agent) { st.session.skipChooser = true; st.session.taskId = null; }
     renderSiteHeader();
     $('#completed').replaceChildren();
     $('#ctl-undo').disabled = true;
@@ -287,7 +344,7 @@
   function renderSiteHeader() {
     const s = st.session;
     const portal = WS.registry.getPortal(s.portalId);
-    $('#site-name').textContent = portal ? (portal.name[st.lang] || portal.name.en) : '';
+    $('#site-name').textContent = portal ? (portal.name[st.lang] || portal.name.en) : (s.agent && st.agent ? t('agentOn', { host: new URL(st.agent.origin).host }) : '');
     const pol = $('#site-policy');
     pol.className = 'policy ' + s.policy;
     pol.textContent = s.policy === 'assist' ? t('assistSite') : t('guideOnlySite');
@@ -308,7 +365,7 @@
   }
 
   function indexElements(scan) {
-    return Object.fromEntries((scan.elements || []).map((e) => [e.id, e]));
+    return Object.fromEntries((scan.elements || []).concat(scan.clickables || []).map((e) => [e.id, e]));
   }
 
   function localPlan(scan) {
@@ -325,7 +382,11 @@
     const ctx = { origin: scan.origin, policy: scan.policy, elements: byId, confirmed: false };
     let proposal = localPlan(scan);
     let source = 'local';
-    const deterministicFirst = ['HUMAN_HANDOFF', 'EXPLAIN_ERROR'].includes(proposal.action.actionType);
+    // Safety rules go first. In agent mode with a model connected, the model decides when a sensitive box matters
+    // (a login form somewhere on a big page is not the user's current step); the gate still turns any fill, question
+    // or press aimed at a sensitive element into a hand-off.
+    const modelLeads = s.agent && WS.api.health.ai;
+    const deterministicFirst = ['HUMAN_HANDOFF', 'EXPLAIN_ERROR'].includes(proposal.action.actionType) && !(modelLeads && proposal.action.actionType === 'HUMAN_HANDOFF');
 
     // A chosen task with a playbook follows the task, not "the next empty box on the page".
     if (!deterministicFirst && s.taskId && WS.playbooks.has(s.taskId)) {
@@ -394,6 +455,9 @@
       if (!(s.taskId && WS.playbooks.has(s.taskId))) updateProgress(scan);
       else await syncStage(s);
       if (!force && userIsAnswering() && indexElements(scan)[s.current.fieldId]) return;
+      // A hand-off stays on screen until the user says they did it; a page change or the model's next idea never skips it.
+      const hc = s.current;
+      if (!force && hc && hc.action && hc.action.actionType === 'HUMAN_HANDOFF' && hc.fieldId && !s.handoffDone.includes(hc.fieldId) && indexElements(scan)[hc.fieldId]) return;
       if (needsChooser()) {
         if (force || s.lastKey !== 'chooser') { s.lastKey = 'chooser'; await renderChooser(); }
         return;
@@ -403,6 +467,7 @@
       if (!force && key === s.lastKey) return;
       s.lastKey = key;
       s.source = d.source;
+      if (s.agent) { s.history.push(d.action.actionType + (d.action.targetElementId ? ' ' + ((d.meta && d.meta.field && d.meta.field.label) || d.action.targetElementId) : '') + ': ' + String(d.action.instruction || '').slice(0, 80)); s.history = s.history.slice(-8); }
       await present(d);
     } catch (err) {
       renderMessage(t('notReady'), 'card-error');
@@ -446,6 +511,7 @@
       case 'HUMAN_HANDOFF': return renderHandoff(d, field);
       case 'EXPLAIN_ERROR': return renderError(d, field);
       case 'ASK_QUESTION': return renderQuestion(d, field);
+      case 'CLICK_ELEMENT': return renderClick(d, field);
       case 'HIGHLIGHT_ELEMENT': return renderGuide(d, field);
       default:
         await highlight(null);
@@ -766,6 +832,7 @@
       actionType: 'FILL_FIELD', targetElementId: field.id, instruction: t('confirmText', { field: field.label }),
       proposedValue: interp.value, requiresConfirmation: true, riskLevel: 'low', expectedOrigin: s.scan.origin
     };
+    if (field.kind === 'clickable' && s.scan.policy === 'assist' && !field.sensitive) return renderConfirm(action, field, interp.display); // custom widget: opened, then typed, after the tap
     const v = WS.safety.validateAction(action, { origin: s.scan.origin, policy: s.scan.policy, elements: indexElements(s.scan), confirmed: false });
     if (v.decision === 'needs-confirmation') return renderConfirm(action, field, interp.display);
     if (v.decision === 'handoff') return renderHandoff({ action: v.action, meta: {}, source: 'local' }, field);
@@ -791,7 +858,11 @@
   async function doFill(action, field) {
     const s = st.session;
     let res;
-    try { res = await send({ type: 'WS_FILL', action, confirmed: true }); } catch (_) { res = { ok: false, code: 'NO_PAGE' }; }
+    try {
+      res = field.kind === 'clickable'
+        ? await send({ type: 'WS_FILL_ID', id: field.id, value: action.proposedValue, confirmed: true })
+        : await send({ type: 'WS_FILL', action, confirmed: true });
+    } catch (_) { res = { ok: false, code: 'NO_PAGE' }; }
     s.current = null;
     if (res && res.ok) {
       s.completed.push(field.label);
@@ -904,7 +975,7 @@
       const tab = await activeTab();
       st.tabId = tab && tab.id;
       const portal = tab && tab.url ? WS.registry.portalForUrl(tab.url) : null;
-      if (!portal) { show('unsupported'); return; }
+      if (!portal) { await startAgent(($('#intent').value || '').trim() || st.task || ''); return; }
       st.portal = portal;
       await startSession(portal.policy === 'assist' ? 'assist' : 'guide');
     });

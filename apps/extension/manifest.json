@@ -3,7 +3,7 @@
   "name": "WebSaathi — AI Web Companion",
   "short_name": "WebSaathi",
   "version": "0.1.0",
-  "description": "Guides non-technical users through verified Indian travel, railway and government websites step by step, in English, Hindi and Kannada. Stops for passwords, OTPs, CAPTCHAs and payments.",
+  "description": "Guides non-technical users through travel, railway and government websites step by step, in English, Hindi and Kannada. On other websites it helps only after you switch it on for that site. Stops for passwords, OTPs, CAPTCHAs and payments.",
   "minimum_chrome_version": "116",
   "icons": {
     "16": "icons/icon16.png",
@@ -72,5 +72,8 @@
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
-  }
+  },
+  "optional_host_permissions": [
+    "https://*/*"
+  ]
 }

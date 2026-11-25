@@ -35,7 +35,9 @@
       options: e.sensitive ? undefined : e.options, error: e.sensitive ? undefined : e.error, text: e.kind === 'button' ? e.text : undefined
     }));
     return WS.redact.redactDeep({
-      origin: scan.origin, title: scan.title, headings: scan.headings, policy: scan.policy, elements, errors: scan.errors
+      origin: scan.origin, title: scan.title, headings: scan.headings, policy: scan.policy, elements, errors: scan.errors,
+      clickables: (scan.clickables || []).map((c) => ({ id: c.id, kind: 'clickable', label: c.label, sensitive: c.sensitive, sensitiveKind: c.sensitiveKind })),
+      pageText: scan.pageText, stage: scan.stage, offers: scan.offers, options: scan.options
     });
   }
 
@@ -66,7 +68,8 @@
           page: sanitizeScan(scan),
           session: {
             mode: session.mode, lang: session.lang, task: WS.redact.redactText(session.task || '').text,
-            skipped: session.skipped, handoffDone: session.handoffDone, explained: session.explained.map((k) => k.split('|')[0])
+            skipped: session.skipped, handoffDone: session.handoffDone, explained: session.explained.map((k) => k.split('|')[0]),
+            agent: session.agent === true, history: session.history || []
           }
         }, 12000);
         return out && out.action ? out : null;

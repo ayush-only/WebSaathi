@@ -19,8 +19,11 @@
   const WS = globalThis.WebSaathi;
   const ORIGIN = location.origin;
   const PORTAL = WS.registry.portalForOrigin(ORIGIN);
-  const POLICY = PORTAL ? PORTAL.policy : null;
-  if (!PORTAL) return; // not a verified origin (e.g. another localhost port): stay completely inactive
+  let POLICY = PORTAL ? PORTAL.policy : null;
+  let AGENT = false; // the user switched on "any other website" for this site
+  // On an origin that is not in the registry this script stays inert (no scanning, no watching, no highlight)
+  // until the user switches on agent mode for that site; WS_PING and WS_SET_AGENT are the only messages it answers.
+  const active = () => !!PORTAL || AGENT;
   const MAX_ELEMENTS = 150;
 
   // ---------------------------------------------------------------- element ids
@@ -221,7 +224,8 @@
         if (t && t.length <= 300) push(t, null);
       });
 
-    return {
+    const extra = AGENT ? agentContext(elements) : {};
+    return Object.assign({
       origin: ORIGIN,
       path: location.pathname,
       title: clean(document.title, 120),
@@ -231,6 +235,35 @@
       elements,
       errors,
       scannedAt: Date.now()
+    }, extra);
+  }
+
+  /** Extra page context for the AI in agent mode: visible text, custom clickable widgets, stage, offers, result cards. No field values. */
+  function agentContext(elements) {
+    const taken = new Set(elements.map((e) => e.label));
+    const clickables = [];
+    let looked = 0;
+    for (const el of document.querySelectorAll('a,div,span,li,[tabindex],[onclick]')) {
+      if (clickables.length >= 40 || ++looked > 900) break;
+      if (el.closest('websaathi-overlay,button,[role="button"],input,select,textarea,label') || !isVisible(el)) continue;
+      const txt = clean(el.innerText, 60);
+      if (txt.length < 2 || txt.length > 40 || txt.includes('\n') || taken.has(txt)) continue;
+      const st = getComputedStyle(el);
+      if (!(st.cursor === 'pointer' || el.tagName === 'A' || el.hasAttribute('tabindex'))) continue;
+      if (el.querySelector('a,[tabindex]')) continue; // only the smallest clickable
+      taken.add(txt);
+      const d = { id: idFor(el), kind: 'clickable', label: txt, visible: true, hasValue: false, disabled: false };
+      const cls = WS.safety.classifyElement(d);
+      d.sensitive = cls.sensitive; d.sensitiveKind = cls.sensitiveKind;
+      clickables.push(d);
+    }
+    const stage = detectStage();
+    return {
+      clickables,
+      pageText: clean(document.body ? document.body.innerText : '', 1500),
+      stage,
+      offers: readOffers(),
+      options: stage === 'results' ? readResults().slice(0, 12).map(({ id, price, depart, arrive, stops, text }) => ({ id, price, depart, arrive, stops, text })) : []
     };
   }
 
@@ -367,7 +400,14 @@
     if (msg.confirmed !== true) return { ok: false, code: 'NEEDS_CONFIRMATION' };
     const found = findByLabel(msg.keys, false);
     if (!found) return { ok: false, code: 'NOT_FOUND' };
-    let node = elById.get(found.id);
+    return fillNode(elById.get(found.id), msg);
+  }
+
+  /** Same as above for a node chosen by id (agent mode). The gate runs again inside fill(). */
+  async function fillNode(node, msg) {
+    if (POLICY !== 'assist') return { ok: false, code: 'GUIDE_ONLY_PORTAL' };
+    if (msg.confirmed !== true) return { ok: false, code: 'NEEDS_CONFIRMATION' };
+    if (!node || !node.isConnected) return { ok: false, code: 'TARGET_GONE' };
     let input = innerInput(node);
     let opened = false;
     if (!input && node) {
@@ -397,8 +437,12 @@
     if (POLICY !== 'assist') return { ok: false, code: 'GUIDE_ONLY_PORTAL' };
     const found = findByLabel(msg.keys, true);
     if (!found) return { ok: false, code: 'NOT_FOUND' };
-    const el = elById.get(found.id);
-    const fresh = el && describe(el);
+    return clickNode(elById.get(found.id), msg);
+  }
+
+  function clickNode(el, msg) {
+    if (POLICY !== 'assist') return { ok: false, code: 'GUIDE_ONLY_PORTAL' };
+    const fresh = el && el.isConnected && describe(el);
     if (!fresh) return { ok: false, code: 'TARGET_GONE' };
     const action = { actionType: 'CLICK_ELEMENT', targetElementId: fresh.id, instruction: 'press', requiresConfirmation: true, riskLevel: 'low', expectedOrigin: ORIGIN };
     const check = WS.safety.validateAction(action, { origin: ORIGIN, policy: POLICY, elements: { [fresh.id]: fresh }, confirmed: msg.confirmed === true });
@@ -594,6 +638,7 @@
 
   let changeTimer = 0;
   function pageChanged(reason) {
+    if (!active()) return;
     clearTimeout(changeTimer);
     changeTimer = setTimeout(() => notify({ type: 'WS_PAGE_CHANGED', reason }), 350);
   }
@@ -605,7 +650,7 @@
     attributeFilter: ['class', 'hidden', 'style', 'aria-invalid', 'aria-hidden', 'disabled'] });
 
   document.addEventListener('invalid', (e) => {
-    if (e.target && e.target.validationMessage) { recentInvalid.set(e.target, e.target.validationMessage); pageChanged('invalid'); }
+    if (active() && e.target && e.target.validationMessage) { recentInvalid.set(e.target, e.target.validationMessage); pageChanged('invalid'); }
   }, true);
   document.addEventListener('change', (e) => { if (e.isTrusted) pageChanged('user-change'); }, true);
 
@@ -616,12 +661,29 @@
     if (!sender || sender.id !== chrome.runtime.id || !String(sender.url || '').startsWith(extPage)) return false;
     let isAsync = false;
     try {
+      if (!active() && !(msg && (msg.type === 'WS_PING' || msg.type === 'WS_SET_AGENT'))) { sendResponse({ ok: false, code: 'INACTIVE' }); return false; }
       switch (msg && msg.type) {
         case 'WS_PING':
           sendResponse({ ok: true, origin: ORIGIN, policy: POLICY, portalId: PORTAL ? PORTAL.id : null, ready: document.readyState });
           break;
         case 'WS_SCAN':
           sendResponse({ ok: true, scan: scan() });
+          break;
+        case 'WS_SET_AGENT': {
+          const a = WS.registry.agentPolicy(ORIGIN);
+          if (PORTAL || !a.ok) { sendResponse({ ok: false, code: PORTAL ? 'ALREADY_SUPPORTED' : a.reason }); break; }
+          AGENT = true; POLICY = a.policy;
+          sendResponse({ ok: true, policy: POLICY });
+          break;
+        }
+        case 'WS_FILL_ID': {
+          const node = elById.get(msg.id);
+          fillNode(node, msg).then(sendResponse, () => sendResponse({ ok: false, code: 'CONTENT_ERROR' }));
+          isAsync = true;
+          break;
+        }
+        case 'WS_CLICK_ID':
+          sendResponse(clickNode(elById.get(msg.id), msg));
           break;
         case 'WS_FILL_KEYS':
           fillByKeys(msg).then(sendResponse, () => sendResponse({ ok: false, code: 'CONTENT_ERROR' }));
