@@ -128,3 +128,5 @@ textarea, input[type="text"] {
 .ready { margin: 0; padding-left: 20px; }
 .ready li { margin: 4px 0; }
 #task-practice { margin-top: 8px; width: 100%; }
+.offers{margin:10px 0;padding:10px 12px;border:2px dashed #fd9b36;border-radius:12px;background:#fff8ef}
+.offers ul{margin:6px 0;padding-left:18px}.offers li{margin:4px 0;font-size:15px}

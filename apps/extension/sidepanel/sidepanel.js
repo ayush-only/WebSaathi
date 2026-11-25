@@ -364,6 +364,19 @@
     return s.current.kind === 'question' && input && input.value.trim() !== '';
   }
 
+  /** Follow the booking: if the page moved on (results → travellers → payment), move the playbook with it. */
+  async function syncStage(s) {
+    let r = null;
+    try { r = await send({ type: 'WS_STAGE' }); } catch (_) { r = null; }
+    s.stage = r && r.ok ? r.stage : null;
+    s.offers = r && r.ok ? r.offers : [];
+    if (!s.stage || s.stage === 'form') return;
+    const steps = WS.playbooks.stepsFor(s.taskId, st.lang);
+    const want = s.stage === 'pay' ? 'pay' : s.stage === 'details' ? 'details' : 'results';
+    const i = steps.findIndex((x) => x.id.startsWith(want));
+    if (i > s.pbIndex && !s.manualBack) { s.pbIndex = i; s.lastKey = ''; }
+  }
+
   async function step(force) {
     const s = st.session;
     if (!s || s.paused) return;
@@ -378,7 +391,8 @@
       }
       const scan = res.scan;
       s.scan = scan;
-      updateProgress(scan);
+      if (!(s.taskId && WS.playbooks.has(s.taskId))) updateProgress(scan);
+      else await syncStage(s);
       if (!force && userIsAnswering() && indexElements(scan)[s.current.fieldId]) return;
       if (needsChooser()) {
         if (force || s.lastKey !== 'chooser') { s.lastKey = 'chooser'; await renderChooser(); }
@@ -405,7 +419,7 @@
   function setCard(cls, ...children) {
     const card = $('#card');
     card.className = 'card ' + (cls || '');
-    card.replaceChildren(...children);
+    card.replaceChildren(...children.filter((c) => c !== null && c !== undefined && c !== false));
   }
 
   function renderMessage(text, cls) {
@@ -494,12 +508,20 @@
       el('p', { class: 'eyebrow' }, (step.final ? '👀 ' : '👉 ') + t('modeGuide')),
       el('p', { class: 'instruction', id: 'pb-text' }, step.text),
       step.keys && !found ? el('p', { class: 'note' }, t('pbNotFound')) : null,
+      offersBlock(s, step),
       el('div', { class: 'row' },
-        step.index > 0 ? el('button', { type: 'button', class: 'btn btn-secondary', id: 'pb-back', onclick: () => { s.pbIndex = Math.max(0, s.pbIndex - 1); s.lastKey = ''; step_(true); } }, t('back')) : null,
-        el('button', { type: 'button', class: 'btn btn-primary', id: 'pb-next', onclick: () => { s.pbIndex += 1; s.lastKey = ''; step_(true); } }, last ? t('pbFinish') : t('pbNext'))),
+        step.index > 0 ? el('button', { type: 'button', class: 'btn btn-secondary', id: 'pb-back', onclick: () => { s.pbIndex = Math.max(0, s.pbIndex - 1); s.manualBack = true; s.lastKey = ''; step_(true); } }, t('back')) : null,
+        el('button', { type: 'button', class: 'btn btn-primary', id: 'pb-next', onclick: () => { s.pbIndex += 1; s.manualBack = false; s.lastKey = ''; step_(true); } }, last ? t('pbFinish') : t('pbNext'))),
       sourceNote('local'));
     $('#pb-next').focus();
     say(step.text);
+  }
+  function offersBlock(s, step) {
+    if (!(step.id.startsWith('results') || step.id === 'details') || !(s.offers && s.offers.length)) return null;
+    return el('div', { class: 'offers' },
+      el('p', { class: 'eyebrow' }, '🏷️ ' + t('pbOffersTitle')),
+      el('ul', {}, s.offers.map((o) => el('li', {}, el('strong', {}, o.code), o.text ? ' — ' + o.text : ''))),
+      el('p', { class: 'note' }, t('pbOffersNote')));
   }
   const step_ = (force) => step(force); // the playbook card has its own local named "step"
 

@@ -282,6 +282,43 @@
     return { id: idFor(target), label: best.txt, tag: target.tagName.toLowerCase() };
   }
 
+
+  // ---------------------------------------------------------------- page stage + offers (read-only)
+  /** Which step of a booking the page is on, from the address and visible headings only. */
+  function detectStage() {
+    const path = (location.pathname + location.search).toLowerCase();
+    const heads = Array.from(document.querySelectorAll('h1,h2,h3,h4,[role="heading"]')).filter(isVisible)
+      .map((h) => clean(textOf(h), 80).toLowerCase()).join(' | ');
+    const body = clean(document.body ? document.body.innerText : '', 4000).toLowerCase();
+    if (/payment|checkout|\/pay\b|paynow/.test(path) || /select (a )?payment|payment options|pay now|upi id|net banking/.test(heads + ' ' + body.slice(0, 1500))) return 'pay';
+    if (/traveller details|passenger details|guest details|traveler details|review(details)?\b/.test(heads) || /reviewdetails|passenger|traveller/.test(path)) return 'details';
+    if (/listing|search-results|\/search\/|results|\/flight\/search|\/hotels\/hotel-listing|\/bus-tickets\//.test(path) || /sort by|showing \d+|\d+ flights?|\d+ buses|\d+ trains/.test(body.slice(0, 2500))) return 'results';
+    return 'form';
+  }
+
+  /** Public coupon / offer text shown on the page (code + short line). Never reads field values. */
+  function readOffers() {
+    const out = [];
+    const seen = new Set();
+    const nodes = document.querySelectorAll('div,li,p,section,article,label');
+    for (const el of nodes) {
+      if (out.length >= 4) break;
+      if (el.closest('websaathi-overlay') || !isVisible(el)) continue;
+      if (el.querySelector('textarea,select')) continue;
+      const txt = clean(el.innerText, 220); // innerText keeps word breaks between blocks; inputs add nothing
+      if (txt.length < 12 || txt.length > 200) continue;
+      if (!/(₹|rs\.?|%|off|discount|save|cashback)/i.test(txt)) continue;
+      const m = txt.match(/\b([A-Z][A-Z0-9]{3,14})\b/);
+      if (!m || /^(EMI|UPI|ICICI|HDFC|SBI|AXIS|VISA|GST|INR|ADD|APPLY|BOOK|FLIGHT|OFFERS?|COUPONS?)$/.test(m[1])) continue;
+      if (seen.has(m[1])) continue;
+      // keep the smallest block: skip if a child already carries the same code
+      if (Array.from(el.children).some((c) => clean(c.innerText, 220).includes(m[1]) && /(₹|%|off|save|discount)/i.test(c.innerText || ''))) continue;
+      seen.add(m[1]);
+      out.push({ code: m[1], text: txt.replace(m[1], '').replace(/\s+/g, ' ').trim().slice(0, 110) });
+    }
+    return out;
+  }
+
   // ---------------------------------------------------------------- overlay
   let overlay = null;
   let target = null;
@@ -296,6 +333,8 @@
       <style>
         .ring{position:fixed;border-radius:10px;pointer-events:none;transition:all .15s ease-out;
           box-shadow:0 0 0 4px var(--c),0 0 18px 6px var(--g),0 0 0 9999px rgba(15,18,40,.28);}
+        :host(.lite) .ring{box-shadow:0 0 0 3px var(--c),0 0 10px 3px var(--g);border-radius:8px}
+        :host(.lite) .tip,:host(.lite) .arrow{display:none}
         .tip{position:fixed;max-width:340px;pointer-events:auto;background:#fff;color:#14163a;border:3px solid var(--c);
           border-radius:12px;padding:12px 14px;font:600 17px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;
           box-shadow:0 8px 24px rgba(0,0,0,.25);}
@@ -327,7 +366,7 @@
     if (!target.isConnected) { clearHighlight(); return; }
     const anchor = target.type === 'radio' ? (target.closest('fieldset,[role="radiogroup"]') || target) : target;
     const r = anchor.getBoundingClientRect();
-    const pad = 6;
+    const pad = overlay.host.classList.contains('lite') ? 3 : 6;
     Object.assign(overlay.ring.style, { left: r.left - pad + 'px', top: r.top - pad + 'px', width: r.width + pad * 2 + 'px', height: r.height + pad * 2 + 'px' });
     const tipW = Math.min(340, innerWidth - 24);
     const below = r.bottom + 14 + 120 < innerHeight;
@@ -347,6 +386,9 @@
     o.tip.style.setProperty('--c', v.c); o.arrow.style.setProperty('--c', v.c);
     o.tip.querySelector('small').textContent = v.label;
     o.tip.querySelector('.msg').textContent = instruction || '';
+    // On real sites the ring is a thin outline only: no dimming and no floating tip, so it can
+    // never cover the site's own dropdowns and popups. The words live in the side panel.
+    o.host.classList.toggle('lite', POLICY !== 'assist');
     o.host.style.display = 'block';
     target = el;
     el.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -460,6 +502,9 @@
           break;
         case 'WS_SCAN':
           sendResponse({ ok: true, scan: scan() });
+          break;
+        case 'WS_STAGE':
+          sendResponse({ ok: true, stage: detectStage(), offers: readOffers() });
           break;
         case 'WS_FIND': {
           const found = findByLabel(msg.keys, msg.button === true);

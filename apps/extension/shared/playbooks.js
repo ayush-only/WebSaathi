@@ -107,7 +107,7 @@
       kn: 'ನಿಮ್ಮ ಆಯ್ಕೆಗಳನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ಈ ಬಟನ್ ನೀವೇ ಒತ್ತಿ. ನಾನು ಒತ್ತುವುದಿಲ್ಲ.'
     },
     resultsFlight: {
-      en: 'Compare the options: total price, timings, number of stops, and whether the fare is refundable. Choose one yourself.',
+      en: 'Compare the options: total price, timings, number of stops (Non-stop = no halt), and whether the fare is refundable. Choose one yourself. Cheaper is not always better: check the timing and baggage.',
       hi: 'विकल्पों की तुलना करें: कुल कीमत, समय, स्टॉप की संख्या, और किराया रिफंडेबल है या नहीं। चुनाव आप खुद करें।',
       kn: 'ಆಯ್ಕೆಗಳನ್ನು ಹೋಲಿಸಿ: ಒಟ್ಟು ಬೆಲೆ, ಸಮಯ, ನಿಲುಗಡೆಗಳು, ಮತ್ತು ಟಿಕೆಟ್ ಮರುಪಾವತಿಯಾಗುತ್ತದೆಯೇ. ನೀವೇ ಆರಿಸಿ.'
     },
@@ -127,9 +127,11 @@
       kn: 'ತೆರಿಗೆ ಸೇರಿದ ಒಟ್ಟು ಬೆಲೆ, ಸ್ಥಳ ಮತ್ತು ರದ್ದತಿ ನೀತಿ ಹೋಲಿಸಿ. ನೀವೇ ಆರಿಸಿ.'
     },
     details: {
-      en: 'On the passenger page, type names exactly as on the ID. Un-tick extras you do not want, such as insurance or protection add-ons.',
-      hi: 'यात्री वाले पेज पर नाम ठीक वैसे लिखें जैसे पहचान-पत्र पर हैं। जो अतिरिक्त चीज़ें नहीं चाहिए (जैसे बीमा या प्रोटेक्शन) उन्हें अनटिक करें।',
-      kn: 'ಪ್ರಯಾಣಿಕರ ಪುಟದಲ್ಲಿ ಹೆಸರನ್ನು ಗುರುತಿನ ಚೀಟಿಯಲ್ಲಿರುವಂತೆಯೇ ಟೈಪ್ ಮಾಡಿ. ನಿಮಗೆ ಬೇಡದ ಹೆಚ್ಚುವರಿಗಳನ್ನು (ವಿಮೆ, ಪ್ರೊಟೆಕ್ಷನ್) ಅನ್‌ಟಿಕ್ ಮಾಡಿ.'
+      keys: ['add new adult', 'add adult', 'add traveller', 'add passenger', 'add new passenger', 'traveller details', 'passenger details'],
+      button: true,
+      en: 'Travellers: if you have saved travellers, tick the right one. Otherwise tap “Add new adult/traveller” and type the name exactly as on the ID. Then check the mobile number and email, and un-tick extras you do not want (insurance, protection).',
+      hi: 'यात्री: अगर सेव किए हुए यात्री हैं तो सही वाले को टिक करें। नहीं तो “Add new adult/traveller” दबाएँ और नाम ठीक वैसे लिखें जैसे पहचान-पत्र पर है। फिर मोबाइल नंबर और ईमेल जाँचें, और जो अतिरिक्त चीज़ें नहीं चाहिए (बीमा, प्रोटेक्शन) उन्हें अनटिक करें।',
+      kn: 'ಪ್ರಯಾಣಿಕರು: ಉಳಿಸಿದ ಪ್ರಯಾಣಿಕರಿದ್ದರೆ ಸರಿಯಾದವರನ್ನು ಟಿಕ್ ಮಾಡಿ. ಇಲ್ಲದಿದ್ದರೆ “Add new adult/traveller” ಒತ್ತಿ ಮತ್ತು ಹೆಸರನ್ನು ಗುರುತಿನ ಚೀಟಿಯಲ್ಲಿರುವಂತೆಯೇ ಟೈಪ್ ಮಾಡಿ. ನಂತರ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಮತ್ತು ಇಮೇಲ್ ಪರಿಶೀಲಿಸಿ, ಬೇಡದ ಹೆಚ್ಚುವರಿಗಳನ್ನು (ವಿಮೆ, ಪ್ರೊಟೆಕ್ಷನ್) ಅನ್‌ಟಿಕ್ ಮಾಡಿ.'
     },
     review: {
       en: 'Check the total price, dates and names once more before you continue.',

@@ -20,7 +20,7 @@ test('booking playbooks follow the task: search form first, then compare, passen
   assert.deepEqual(flight.slice(0, 5), ['tripType', 'from', 'to', 'date', 'travellers']);
   assert.ok(flight.indexOf('search') < flight.indexOf('details'));
   assert.equal(flight[flight.length - 1], 'pay');
-  assert.match(playbooks.stepsFor('book_flight', 'en').find((s) => s.id === 'details').text, /Un-tick extras/);
+  assert.match(playbooks.stepsFor('book_flight', 'en').find((s) => s.id === 'details').text, /un-tick extras/);
 });
 
 test('the Search / Cancel steps are marked final: the user presses them, never WebSaathi', () => {

@@ -81,7 +81,7 @@ test('task playbook on a noisy travel page', { skip: exe ? false : 'Chrome not f
     await panel.click('#pb-next');
     await stepText(panel, /total price.*refundable/);
     await panel.click('#pb-next');
-    await stepText(panel, /Un-tick extras you do not want/);
+    await stepText(panel, /un-tick extras you do not want/);
     await panel.click('#pb-next');
     await stepText(panel, /once more/);
     await panel.click('#pb-next');
