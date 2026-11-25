@@ -27,8 +27,10 @@
    * policy:
    *  - 'assist'     → Guide Mode and Assist Mode (form filling after confirmation)
    *  - 'guide-only' → highlight + explain only. Never fills, clicks or submits.
-   * Every real portal is guide-only in this prototype: we never send fake
-   * grievances to real services and IRCTC's terms prohibit automation.
+   * Government and railway portals are guide-only: we never send fake grievances to real
+   * services and IRCTC's terms prohibit automation. Private travel sites (kind 'travel') are
+   * 'assist': the user confirms each fill or click, and payment, OTP, passwords, cards and UPI
+   * are never touched (see safety.js).
    */
   const PORTALS = [
     {
@@ -139,7 +141,7 @@
       },
       url: 'https://www.makemytrip.com/',
       origins: ['https://www.makemytrip.com'],
-      policy: 'guide-only',
+      policy: 'assist',
       keywords: { makemytrip: 6, mmt: 5 }
     },
     {
@@ -153,7 +155,7 @@
       },
       url: 'https://www.goibibo.com/',
       origins: ['https://www.goibibo.com'],
-      policy: 'guide-only',
+      policy: 'assist',
       keywords: { goibibo: 6 }
     },
     {
@@ -167,7 +169,7 @@
       },
       url: 'https://www.yatra.com/',
       origins: ['https://www.yatra.com'],
-      policy: 'guide-only',
+      policy: 'assist',
       keywords: { yatra: 6 }
     },
     {
@@ -181,7 +183,7 @@
       },
       url: 'https://www.ixigo.com/',
       origins: ['https://www.ixigo.com'],
-      policy: 'guide-only',
+      policy: 'assist',
       keywords: { ixigo: 6 }
     },
     {
@@ -195,7 +197,7 @@
       },
       url: 'https://www.redbus.in/',
       origins: ['https://www.redbus.in'],
-      policy: 'guide-only',
+      policy: 'assist',
       keywords: { redbus: 6, 'red bus': 6 }
     },
     {

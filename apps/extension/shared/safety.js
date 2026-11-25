@@ -34,7 +34,11 @@
   const IRREVERSIBLE_RE = /\b(submit|pay|payment|confirm|book now|book ticket|place order|proceed to pay|lodge|register (complaint|grievance)|sign in|log ?in|delete|transfer|buy)\b|सबमिट|जमा करें|भुगतान|पुष्टि|ಸಲ್ಲಿಸು|ಪಾವತಿ|ದೃಢೀಕರಿಸು/i;
 
   const FILLABLE_KINDS = Object.freeze(['text', 'email', 'tel', 'number', 'textarea', 'select', 'radio', 'checkbox', 'date', 'url', 'search']);
-  const DOM_ACTIONS = new Set(['HIGHLIGHT_ELEMENT', 'FILL_FIELD', 'ASK_QUESTION']);
+  const DOM_ACTIONS = new Set(['HIGHLIGHT_ELEMENT', 'FILL_FIELD', 'CLICK_ELEMENT', 'ASK_QUESTION']);
+
+  /** The only buttons WebSaathi may press for the user, and only after they confirm. Everything else is theirs. */
+  const CLICK_ALLOW_RE = /^(search( flights?| buses| bus| hotels?| trains?)?|apply( coupon| code| offer)?)$/i;
+  const CLICK_BLOCK_RE = /\b(pay|payment|otp|password|upi|card|net ?banking|wallet|book now|book ticket|proceed|confirm|submit|buy|sign in|log ?in|delete|cancel)\b/i;
 
   /**
    * Classify a scanned element descriptor.
@@ -106,6 +110,15 @@
       return result('handoff', 'HIGH_RISK', { ...action, actionType: 'HUMAN_HANDOFF', proposedValue: null, requiresConfirmation: false });
     }
 
+    if (action.actionType === 'CLICK_ELEMENT') {
+      const toLook = (code) => result('downgrade', code, { ...action, actionType: 'HIGHLIGHT_ELEMENT', proposedValue: null, requiresConfirmation: false });
+      if (ctx.policy !== 'assist') return toLook('GUIDE_ONLY_PORTAL');
+      if (!el || el.kind !== 'button' || el.disabled) return result('block', 'NOT_A_BUTTON');
+      const label = String(el.text || el.label || '').replace(/\s+/g, ' ').trim();
+      if (CLICK_BLOCK_RE.test(label) || !CLICK_ALLOW_RE.test(label)) return toLook('CLICK_NOT_ALLOWED');
+      if (!ctx.confirmed) return { ok: false, decision: 'needs-confirmation', code: 'NEEDS_CONFIRMATION', action };
+      return result('allow', 'OK', action);
+    }
     if (action.actionType !== 'FILL_FIELD') return result('allow', 'OK', action);
 
     // ---- FILL_FIELD rules ----
@@ -125,5 +138,5 @@
     return result('allow', 'OK', action);
   }
 
-  return { SENSITIVE_RULES, FILLABLE_KINDS, classifyElement, validateAction, IRREVERSIBLE_RE };
+  return { SENSITIVE_RULES, FILLABLE_KINDS, CLICK_ALLOW_RE, CLICK_BLOCK_RE, classifyElement, validateAction, IRREVERSIBLE_RE };
 });

@@ -23,7 +23,7 @@
 
 ## New website categories
 
-Private travel sites, AirSewa and NTES are **guide-only** and have host permission without an always-on content script (injected only when the user asks to be guided). Payment and login sub-domains are not in the registry, so WebSaathi goes inactive there and warns when a guided tab leaves a verified origin. Banking is excluded by design: the launcher says it is unsupported rather than routing to a bank.
+AirSewa and NTES are **guide-only**. Private travel sites are **Assist**: every fill and every Search/Apply press needs the user's tap, and payment, OTP, password, card and UPI are never touched. All of them have host permission without an always-on content script (injected only when the user asks to be guided). Payment and login sub-domains are not in the registry, so WebSaathi goes inactive there and warns when a guided tab leaves a verified origin. Banking is excluded by design: the launcher says it is unsupported rather than routing to a bank.
 
 ## Not production-ready yet
 

@@ -275,7 +275,7 @@
         const p = target.parentElement;
         if (!p || p === document.body || p === document.documentElement) break;
         const r = p.getBoundingClientRect();
-        if (textOf(p).length > 90 || r.width > window.innerWidth * 0.6 || r.height > 220) break;
+        if (textOf(p).length > 90 || p.children.length > 3 || r.width > window.innerWidth * 0.45 || r.height > 220) break;
         target = p;
       }
     }
@@ -290,8 +290,9 @@
     const heads = Array.from(document.querySelectorAll('h1,h2,h3,h4,[role="heading"]')).filter(isVisible)
       .map((h) => clean(textOf(h), 80).toLowerCase()).join(' | ');
     const body = clean(document.body ? document.body.innerText : '', 4000).toLowerCase();
-    if (/payment|checkout|\/pay\b|paynow/.test(path) || /select (a )?payment|payment options|pay now|upi id|net banking/.test(heads + ' ' + body.slice(0, 1500))) return 'pay';
-    if (/traveller details|passenger details|guest details|traveler details|review(details)?\b/.test(heads) || /reviewdetails|passenger|traveller/.test(path)) return 'details';
+    // Headings and the address decide; loose body text ("Pay now" on a traveller page) does not.
+    if (/payment|checkout|\/pay\b|paynow/.test(path) || /select (a )?payment|payment options|choose payment|pay securely/.test(heads)) return 'pay';
+    if (/traveller details|passenger details|guest details|traveler details/.test(heads) || /reviewdetails|passenger|traveller/.test(path)) return 'details';
     if (/listing|search-results|\/search\/|results|\/flight\/search|\/hotels\/hotel-listing|\/bus-tickets\//.test(path) || /sort by|showing \d+|\d+ flights?|\d+ buses|\d+ trains/.test(body.slice(0, 2500))) return 'results';
     return 'form';
   }
@@ -307,9 +308,9 @@
       if (el.querySelector('textarea,select')) continue;
       const txt = clean(el.innerText, 220); // innerText keeps word breaks between blocks; inputs add nothing
       if (txt.length < 12 || txt.length > 200) continue;
-      if (!/(₹|rs\.?|%|off|discount|save|cashback)/i.test(txt)) continue;
+      if (!/\b(off|discount|cashback|save|coupon|code|instant)\b/i.test(txt)) continue;
       const m = txt.match(/\b([A-Z][A-Z0-9]{3,14})\b/);
-      if (!m || /^(EMI|UPI|ICICI|HDFC|SBI|AXIS|VISA|GST|INR|ADD|APPLY|BOOK|FLIGHT|OFFERS?|COUPONS?)$/.test(m[1])) continue;
+      if (!m || /^(EMI|UPI|ICICI|HDFC|SBI|AXIS|VISA|GST|INR|ADD|APPLY|BOOK|FLIGHT|OFFERS?|COUPONS?|ADULT|ADULTS|CHILD|INFANT|TOTAL|PRICE|FARE|TAXES|BASE|MALE|FEMALE|ECONOMY|NOTE)$/.test(m[1])) continue;
       if (seen.has(m[1])) continue;
       // keep the smallest block: skip if a child already carries the same code
       if (Array.from(el.children).some((c) => clean(c.innerText, 220).includes(m[1]) && /(₹|%|off|save|discount)/i.test(c.innerText || ''))) continue;
@@ -317,6 +318,101 @@
       out.push({ code: m[1], text: txt.replace(m[1], '').replace(/\s+/g, ' ').trim().slice(0, 110) });
     }
     return out;
+  }
+
+
+  // ---------------------------------------------------------------- confirmed assist actions (travel + demo)
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const TEXTY = ['text', 'email', 'tel', 'number', 'search', 'url', 'date', ''];
+
+  function innerInput(root) {
+    if (!root) return null;
+    if (root.tagName === 'INPUT' || root.tagName === 'SELECT' || root.tagName === 'TEXTAREA') return root;
+    const all = Array.from(root.querySelectorAll('input,select,textarea')).filter((e) => isVisible(e) && !['checkbox', 'radio', 'hidden', 'password', 'file'].includes((e.type || '').toLowerCase()));
+    return all[0] || null;
+  }
+
+  /** Pick the select option that matches a typed value ("2" → "2 Adults"). */
+  function optionFor(sel, value) {
+    const v = String(value).trim().toLowerCase();
+    const opts = Array.from(sel.options).filter((o) => o.value !== '' && !o.disabled);
+    return (opts.find((o) => o.value.toLowerCase() === v) || opts.find((o) => o.text.trim().toLowerCase() === v) ||
+      opts.find((o) => new RegExp('(^|\\D)' + v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\D|$)', 'i').test(o.text)) || {}).value || null;
+  }
+
+  /** Type a value the user confirmed into the box found by its visible words. The safety gate runs again inside fill(). */
+  async function fillByKeys(msg) {
+    if (POLICY !== 'assist') return { ok: false, code: 'GUIDE_ONLY_PORTAL' };
+    if (msg.confirmed !== true) return { ok: false, code: 'NEEDS_CONFIRMATION' };
+    const found = findByLabel(msg.keys, false);
+    if (!found) return { ok: false, code: 'NOT_FOUND' };
+    let node = elById.get(found.id);
+    let input = innerInput(node);
+    let opened = false;
+    if (!input && node) {
+      // A custom widget (for example a "From" card): open it the way a person would, then type into the box that appears.
+      const fresh = describe(node);
+      if (fresh && fresh.sensitive) return { ok: false, code: 'SENSITIVE_TARGET' };
+      node.click();
+      opened = true;
+      await sleep(450);
+      const a = document.activeElement;
+      if (a && a.tagName === 'INPUT' && TEXTY.includes((a.type || '').toLowerCase()) && isVisible(a)) input = a;
+    }
+    if (!input) return { ok: false, code: 'NO_INPUT', opened };
+    let value = String(msg.value || '');
+    if (input.tagName === 'SELECT') {
+      value = optionFor(input, value);
+      if (!value) return { ok: false, code: 'INVALID_OPTION' };
+    } else if (input.type === 'date' && msg.alt) value = String(msg.alt);
+    const action = { actionType: 'FILL_FIELD', targetElementId: idFor(input), instruction: 'fill', proposedValue: value,
+      requiresConfirmation: true, riskLevel: 'low', expectedOrigin: ORIGIN };
+    const res = fill(action, true);
+    return Object.assign({ opened }, res, { element: undefined });
+  }
+
+  /** Press one of the few allowed buttons (Search, Apply) after the user confirmed. Gate decides; payment-like words never pass. */
+  function clickByKeys(msg) {
+    if (POLICY !== 'assist') return { ok: false, code: 'GUIDE_ONLY_PORTAL' };
+    const found = findByLabel(msg.keys, true);
+    if (!found) return { ok: false, code: 'NOT_FOUND' };
+    const el = elById.get(found.id);
+    const fresh = el && describe(el);
+    if (!fresh) return { ok: false, code: 'TARGET_GONE' };
+    const action = { actionType: 'CLICK_ELEMENT', targetElementId: fresh.id, instruction: 'press', requiresConfirmation: true, riskLevel: 'low', expectedOrigin: ORIGIN };
+    const check = WS.safety.validateAction(action, { origin: ORIGIN, policy: POLICY, elements: { [fresh.id]: fresh }, confirmed: msg.confirmed === true });
+    if (check.decision !== 'allow') return { ok: false, code: check.code, decision: check.decision };
+    highlight(el, '', 'fill');
+    el.click();
+    return { ok: true, code: 'CLICKED', label: fresh.text || fresh.label };
+  }
+
+  /** Flight/bus/train result cards, read from visible text only: price, times, stops, duration. */
+  function readResults() {
+    const cards = [];
+    const priceRe = /₹\s?([\d,]{3,7})/;
+    for (const el of document.querySelectorAll('div,li,article,tr,section')) {
+      if (cards.length >= 40) break;
+      if (el.closest('websaathi-overlay') || !isVisible(el)) continue;
+      if (el.querySelector('textarea,select')) continue;
+      const txt = clean(el.innerText, 400);
+      if (txt.length < 20 || txt.length > 380) continue;
+      const pm = txt.match(priceRe);
+      const times = txt.match(/\b([01]?\d|2[0-3]):[0-5]\d\b/g);
+      if (!pm || !times || times.length < 1) continue;
+      // smallest block only: skip a wrapper whose child is already a complete card
+      if (Array.from(el.children).some((c) => { const t2 = clean(c.innerText, 400); return priceRe.test(t2) && /\b([01]?\d|2[0-3]):[0-5]\d\b/.test(t2); })) continue;
+      const dm = txt.match(/(\d+)\s*h(?:\s*(\d+)\s*m)?/i);
+      cards.push({
+        id: idFor(el),
+        price: Number(pm[1].replace(/,/g, '')),
+        depart: times[0], arrive: times[1] || null,
+        stops: /non[- ]?stop/i.test(txt) ? 0 : (txt.match(/(\d)\s*stops?/i) ? Number(txt.match(/(\d)\s*stops?/i)[1]) : null),
+        minutes: dm ? Number(dm[1]) * 60 + Number(dm[2] || 0) : null,
+        text: txt.replace(/book now|select|view fare|details/gi, '').replace(/\s+/g, ' ').trim().slice(0, 90)
+      });
+    }
+    return cards;
   }
 
   // ---------------------------------------------------------------- overlay
@@ -388,7 +484,7 @@
     o.tip.querySelector('.msg').textContent = instruction || '';
     // On real sites the ring is a thin outline only: no dimming and no floating tip, so it can
     // never cover the site's own dropdowns and popups. The words live in the side panel.
-    o.host.classList.toggle('lite', POLICY !== 'assist');
+    o.host.classList.toggle('lite', !(PORTAL && PORTAL.kind === 'demo'));
     o.host.style.display = 'block';
     target = el;
     el.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -495,6 +591,7 @@
     // Only accept messages from this extension's own pages (side panel), never from web pages or other content scripts.
     const extPage = 'chrome-extension://' + chrome.runtime.id + '/';
     if (!sender || sender.id !== chrome.runtime.id || !String(sender.url || '').startsWith(extPage)) return false;
+    let isAsync = false;
     try {
       switch (msg && msg.type) {
         case 'WS_PING':
@@ -502,6 +599,16 @@
           break;
         case 'WS_SCAN':
           sendResponse({ ok: true, scan: scan() });
+          break;
+        case 'WS_FILL_KEYS':
+          fillByKeys(msg).then(sendResponse, () => sendResponse({ ok: false, code: 'CONTENT_ERROR' }));
+          isAsync = true;
+          break;
+        case 'WS_CLICK_KEYS':
+          sendResponse(clickByKeys(msg));
+          break;
+        case 'WS_RESULTS':
+          sendResponse({ ok: true, options: readResults() });
           break;
         case 'WS_STAGE':
           sendResponse({ ok: true, stage: detectStage(), offers: readOffers() });
@@ -537,7 +644,7 @@
     } catch (err) {
       sendResponse({ ok: false, code: 'CONTENT_ERROR', message: String(err && err.message || err).slice(0, 200) });
     }
-    return false;
+    return isAsync;
   });
 
   // Expose pure functions for automated tests only (no effect on pages).

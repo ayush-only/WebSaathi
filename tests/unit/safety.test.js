@@ -106,3 +106,16 @@ test('prompt-injection style output: extra keys are stripped, not executed', () 
   assert.equal(schema.parseModelAction('no json here').ok, false);
   assert.equal(schema.parseModelAction('{"actionType":"HIGHLIGHT_ELEMENT"').ok, false);
 });
+
+test('CLICK_ELEMENT: only Search/Apply, only on assist sites, only after confirmation; payment-like buttons never', () => {
+  const btn = (id, text) => ({ [id]: { id, kind: 'button', text, label: text, visible: true, disabled: false, sensitive: false } });
+  const act = (id) => ({ actionType: 'CLICK_ELEMENT', targetElementId: id, instruction: 'press', requiresConfirmation: true, riskLevel: 'low', expectedOrigin: 'https://www.makemytrip.com' });
+  const ctx = (elements, extra) => Object.assign({ origin: 'https://www.makemytrip.com', policy: 'assist', elements, confirmed: false }, extra);
+  assert.equal(safety.validateAction(act('ws-1'), ctx(btn('ws-1', 'SEARCH'))).decision, 'needs-confirmation');
+  assert.equal(safety.validateAction(act('ws-1'), ctx(btn('ws-1', 'SEARCH'), { confirmed: true })).decision, 'allow');
+  assert.equal(safety.validateAction(act('ws-1'), ctx(btn('ws-1', 'APPLY'), { confirmed: true })).decision, 'allow');
+  for (const label of ['PAY NOW', 'Book Now', 'Continue', 'Proceed to payment', 'Confirm', 'Cancel booking', 'Verify OTP', 'Search with UPI']) {
+    assert.equal(safety.validateAction(act('ws-1'), ctx(btn('ws-1', label), { confirmed: true })).decision, 'downgrade', label);
+  }
+  assert.equal(safety.validateAction(act('ws-1'), ctx(btn('ws-1', 'SEARCH'), { policy: 'guide-only', confirmed: true })).decision, 'downgrade');
+});

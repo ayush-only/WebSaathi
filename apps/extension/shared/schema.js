@@ -15,13 +15,14 @@
     'HIGHLIGHT_ELEMENT',
     'ASK_QUESTION',
     'FILL_FIELD',
+    'CLICK_ELEMENT',
     'EXPLAIN_ERROR',
     'HUMAN_HANDOFF',
     'WAIT_FOR_USER',
     'COMPLETE_GUIDANCE'
   ]);
   const RISK_LEVELS = Object.freeze(['low', 'medium', 'high']);
-  const NEEDS_TARGET = new Set(['HIGHLIGHT_ELEMENT', 'FILL_FIELD', 'ASK_QUESTION']);
+  const NEEDS_TARGET = new Set(['HIGHLIGHT_ELEMENT', 'FILL_FIELD', 'CLICK_ELEMENT', 'ASK_QUESTION']);
   const ID_RE = /^ws-\d{1,5}$/;
 
   const LIMITS = { instruction: 400, reason: 400, proposedValue: 2000, expectedOrigin: 200 };
@@ -58,7 +59,7 @@
     const requiresConfirmation = input.requiresConfirmation == null ? true : input.requiresConfirmation;
     if (typeof requiresConfirmation !== 'boolean') errors.push('BAD_REQUIRES_CONFIRMATION');
     // Fills always need confirmation, whatever the proposer says.
-    if (actionType === 'FILL_FIELD' && requiresConfirmation === false) errors.push('FILL_MUST_REQUIRE_CONFIRMATION');
+    if ((actionType === 'FILL_FIELD' || actionType === 'CLICK_ELEMENT') && requiresConfirmation === false) errors.push('FILL_MUST_REQUIRE_CONFIRMATION');
 
     const riskLevel = input.riskLevel == null ? 'low' : input.riskLevel;
     if (!RISK_LEVELS.includes(riskLevel)) errors.push('BAD_RISK_LEVEL');

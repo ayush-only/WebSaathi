@@ -66,10 +66,11 @@ test('task playbook on a noisy travel page', { skip: exe ? false : 'Chrome not f
   await t.test('follows the flight task step by step instead of walking random boxes', async () => {
     await panel.click('#help-page');
     await panel.waitForSelector('#pb-text', { timeout: 10000 });
+    await panel.click('.mode[data-mode="guide"]'); // this test covers Guide mode; assist-travel.test.js covers Assist
     const expected = [/One Way or Round Trip/, /FROM/, /TO\./, /travel date/, /how many people/, /press this button yourself/];
     for (let i = 0; i < expected.length; i++) {
       await stepText(panel, expected[i]);
-      assert.match(await panel.textContent('#progress-text'), new RegExp(`Step ${i + 1} of 10`));
+      assert.match(await panel.textContent('#progress-text'), new RegExp(`Step ${i + 1} of 12`));
       if (i > 0 && i < 5) assert.equal(await page.evaluate(() => document.querySelector('websaathi-overlay').style.display), 'block', 'a spot is highlighted at step ' + (i + 1));
       if (i < expected.length - 1) await panel.click('#pb-next');
     }
@@ -82,6 +83,10 @@ test('task playbook on a noisy travel page', { skip: exe ? false : 'Chrome not f
     await stepText(panel, /total price.*refundable/);
     await panel.click('#pb-next');
     await stepText(panel, /un-tick extras you do not want/);
+    await panel.click('#pb-next');
+    await stepText(panel, /lock the price/);
+    await panel.click('#pb-next');
+    await stepText(panel, /do you have a coupon code/i);
     await panel.click('#pb-next');
     await stepText(panel, /once more/);
     await panel.click('#pb-next');

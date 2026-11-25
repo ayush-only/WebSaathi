@@ -68,7 +68,7 @@ test('extension end-to-end in Local Demo Mode', { skip: exe ? false : 'Chrome no
     await panel.waitForSelector('#screen-home:not([hidden])');
   });
 
-  await t.test('launcher: category tiles, "which kind?" step, and travel sites are guide-only', async () => {
+  await t.test('launcher: category tiles, "which kind?" step, and travel sites offer Assist', async () => {
     assert.equal(await panel.locator('#category-tiles .task').count(), 4);
     await panel.click('#category-tiles [data-category="book"]');
     await panel.waitForSelector('#screen-kinds:not([hidden])');
@@ -78,8 +78,7 @@ test('extension end-to-end in Local Demo Mode', { skip: exe ? false : 'Chrome no
     const ids = await panel.$$eval('#options-list .opt', (n) => n.map((x) => x.dataset.portal));
     assert.deepEqual(ids, ['makemytrip', 'goibibo', 'yatra', 'ixigo']);
     assert.match(await panel.textContent('#options-list'), /Private travel company website/);
-    assert.match(await panel.textContent('#options-list'), /Guide Mode/);
-    assert.doesNotMatch(await panel.textContent('#options-list'), /Practice site: I can fill/);
+    assert.match(await panel.textContent('#options-list'), /Assist Mode: I can fill after you confirm/);
     assert.ok(await panel.locator('#ready-list li').count() >= 2);
     await panel.click('#options-list .opt[data-portal="makemytrip"]');
     await panel.waitForSelector('#screen-route:not([hidden])');

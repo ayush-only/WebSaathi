@@ -503,15 +503,19 @@
     $('#progress-bar').setAttribute('aria-valuemax', String(step.total));
     $('#progress-bar').setAttribute('aria-valuenow', String(step.index));
     $('#progress-fill').style.width = Math.round((step.index / step.total) * 100) + '%';
-    const last = step.index === step.total - 1;
+    if (s.policy === 'assist' && s.mode === 'assist') {
+      if (['text', 'date', 'count'].includes(step.ask)) return renderAsk(s, step, found);
+      if (step.act === 'click') return renderClickAsk(s, step);
+      if (step.id.startsWith('results')) return renderPrefs(s, step);
+      if (step.ask === 'choice') return renderExtras(s, step, found);
+      if (step.ask === 'coupon') return renderCoupon(s, step, found);
+    }
     setCard(step.final ? 'card-confirm' : '',
       el('p', { class: 'eyebrow' }, (step.final ? '👀 ' : '👉 ') + t('modeGuide')),
       el('p', { class: 'instruction', id: 'pb-text' }, step.text),
       step.keys && !found ? el('p', { class: 'note' }, t('pbNotFound')) : null,
       offersBlock(s, step),
-      el('div', { class: 'row' },
-        step.index > 0 ? el('button', { type: 'button', class: 'btn btn-secondary', id: 'pb-back', onclick: () => { s.pbIndex = Math.max(0, s.pbIndex - 1); s.manualBack = true; s.lastKey = ''; step_(true); } }, t('back')) : null,
-        el('button', { type: 'button', class: 'btn btn-primary', id: 'pb-next', onclick: () => { s.pbIndex += 1; s.manualBack = false; s.lastKey = ''; step_(true); } }, last ? t('pbFinish') : t('pbNext'))),
+      pbNav(s, step),
       sourceNote('local'));
     $('#pb-next').focus();
     say(step.text);
@@ -522,6 +526,177 @@
       el('p', { class: 'eyebrow' }, '🏷️ ' + t('pbOffersTitle')),
       el('ul', {}, s.offers.map((o) => el('li', {}, el('strong', {}, o.code), o.text ? ' — ' + o.text : ''))),
       el('p', { class: 'note' }, t('pbOffersNote')));
+  }
+  // ---------------------------------------------------------------- assist on travel sites: ask → confirm → do
+  function pbNav(s, step) {
+    const last = step.index === step.total - 1;
+    return el('div', { class: 'row' },
+      step.index > 0 ? el('button', { type: 'button', class: 'btn btn-secondary', id: 'pb-back', onclick: () => { s.pbIndex = Math.max(0, s.pbIndex - 1); s.manualBack = true; s.lastKey = ''; step_(true); } }, t('back')) : null,
+      el('button', { type: 'button', class: 'btn btn-primary', id: 'pb-next', onclick: () => { s.pbIndex += 1; s.manualBack = false; s.lastKey = ''; step_(true); } }, last ? t('pbFinish') : t('pbNext')));
+  }
+  const pbGo = (s) => { s.pbIndex += 1; s.manualBack = false; s.lastKey = ''; step_(true); };
+  const fieldName = (step) => (step.keys && step.keys[0]) || step.id;
+  const sendSafe = async (m) => { try { return await send(m); } catch (_) { return { ok: false, code: 'NO_PAGE' }; } };
+  const pbNavSmall = (s, step) => (step.index > 0 ? el('div', { class: 'row' }, el('button', { type: 'button', class: 'btn btn-small', id: 'pb-back', onclick: () => { s.pbIndex = Math.max(0, s.pbIndex - 1); s.manualBack = true; s.lastKey = ''; step_(true); } }, t('back'))) : null);
+
+  function renderAsk(s, step) {
+    s.current = { kind: 'playbook', fieldId: null, action: null, meta: null, source: 'local' };
+    const input = el('input', { id: 'answer', type: 'text', 'aria-label': t('yourAnswer'), autocomplete: 'off' });
+    const form = el('form', { onsubmit: (e) => {
+      e.preventDefault();
+      let value = input.value.trim(); let alt = null; let display = value;
+      const msg = $('#answer-msg');
+      if (step.ask === 'date') { const d = WS.playbooks.parseDate(value); if (!d) { msg.textContent = t('typeAnswer'); return; } value = display = d.display; alt = d.iso; }
+      else if (step.ask === 'count') { const n = value.match(/\d+/); if (!n) { msg.textContent = t('typeAnswer'); return; } value = display = n[0]; }
+      else if (!value) { msg.textContent = t('typeAnswer'); return; }
+      renderConfirmType(s, step, value, alt, display);
+    } }, input,
+      el('div', { class: 'row' },
+        el('button', { type: 'button', class: 'btn btn-mic', 'data-mic-for': 'answer', onclick: micHandler }, '🎤 ', t('speak')),
+        el('button', { type: 'submit', class: 'btn btn-primary' }, t('next'))));
+    setCard('',
+      el('p', { class: 'eyebrow' }, '💬 ' + t('modeAssist')),
+      el('p', { class: 'instruction', id: 'pb-text' }, step.q),
+      form,
+      el('p', { class: 'msg', id: 'answer-msg', role: 'status' }),
+      el('p', { class: 'note' }, t('pbAskNote')),
+      el('div', { class: 'row' }, el('button', { type: 'button', class: 'btn btn-small', id: 'pb-skip', onclick: () => pbGo(s) }, t('skip'))),
+      sourceNote('local'));
+    input.focus();
+    say(step.q);
+  }
+
+  function renderConfirmType(s, step, value, alt, display) {
+    setCard('card-confirm',
+      el('p', { class: 'eyebrow' }, '🔎 ' + t('confirmTitle')),
+      el('p', { class: 'instruction', id: 'pb-text' }, t('pbConfirmType', { field: fieldName(step), value: display })),
+      el('div', { class: 'row' },
+        el('button', { type: 'button', class: 'btn btn-primary', id: 'confirm-yes', onclick: async () => {
+          const r = await sendSafe({ type: 'WS_FILL_KEYS', keys: step.keys, value, alt, confirmed: true });
+          if (r && r.ok) {
+            s.completed.push(fieldName(step)); $('#completed').append(el('li', {}, '✓ ' + fieldName(step)));
+            setCard('card-done', el('p', { class: 'instruction', id: 'pb-text' }, '✓ ' + t('pbFilled')), pbNav(s, step));
+            $('#pb-next').focus(); say(t('pbFilled'));
+          } else {
+            setCard('card-error', el('p', { class: 'instruction', id: 'pb-text' }, t('pbCantType')),
+              el('p', { class: 'raw' }, r && r.code ? r.code : ''), pbNav(s, step));
+            $('#pb-next').focus(); say(t('pbCantType'));
+          }
+        } }, '✓ ' + t('pbYesType')),
+        el('button', { type: 'button', class: 'btn btn-secondary', onclick: () => renderAsk(s, step) }, t('change'))));
+    $('#confirm-yes').focus();
+  }
+
+  function renderClickAsk(s, step) {
+    setCard('card-confirm',
+      el('p', { class: 'eyebrow' }, '🔎 ' + t('confirmTitle')),
+      el('p', { class: 'instruction', id: 'pb-text' }, t('pbSearchAsk')),
+      el('div', { class: 'row' },
+        el('button', { type: 'button', class: 'btn btn-primary', id: 'confirm-yes', onclick: async () => {
+          const r = await sendSafe({ type: 'WS_CLICK_KEYS', keys: step.clickKeys, confirmed: true });
+          if (r && r.ok) { say(t('pbFilled')); setTimeout(() => pbGo(s), 700); return; }
+          setCard('card-error', el('p', { class: 'instruction', id: 'pb-text' }, t('pbCantType')), el('p', { class: 'raw' }, r && r.code ? r.code : ''), pbNav(s, step));
+        } }, '✓ ' + t('pbYesSearch')),
+        el('button', { type: 'button', class: 'btn btn-secondary', id: 'pb-self', onclick: () => pbGo(s) }, t('pbIPress'))),
+      pbNavSmall(s, step));
+    $('#confirm-yes').focus();
+    say(t('pbSearchAsk'));
+  }
+
+  function renderPrefs(s, step) {
+    s.pref = s.pref || { by: 'cheapest', window: 'any', nonstop: false, maxPrice: '' };
+    const sel = (id, opts, cur) => el('select', { id, 'aria-label': id }, opts.map(([v, k]) => el('option', Object.assign({ value: v }, v === cur ? { selected: 'selected' } : {}), t(k))));
+    const by = sel('pref-by', [['cheapest', 'pbCheapest'], ['fastest', 'pbFastest'], ['earliest', 'pbEarliest']], s.pref.by);
+    const win = sel('pref-window', [['any', 'pbAnyTime'], ['morning', 'pbMorning'], ['afternoon', 'pbAfternoon'], ['evening', 'pbEvening']], s.pref.window);
+    const nonstop = el('input', { type: 'checkbox', id: 'pref-nonstop' });
+    const max = el('input', { type: 'text', id: 'pref-max', inputmode: 'numeric', placeholder: t('pbMaxPrice'), 'aria-label': t('pbMaxPrice') });
+    const out = el('div', { id: 'pb-results' });
+    const show = async () => {
+      const pref = { by: by.value, window: win.value, nonstop: nonstop.checked, maxPrice: Number((max.value || '').replace(/\D/g, '')) || 0 };
+      s.pref = pref;
+      const r = await sendSafe({ type: 'WS_RESULTS' });
+      const top = WS.playbooks.rankOptions((r && r.options) || [], pref, 3);
+      out.replaceChildren(...(top.length ? [
+        el('ol', { class: 'best' }, top.map((o) => el('li', {},
+          el('strong', {}, '₹' + o.price.toLocaleString('en-IN')), ' · ' + o.depart + (o.arrive ? '→' + o.arrive : '') + (o.stops === 0 ? ' · Non-stop' : o.stops ? ' · ' + o.stops + ' stop' : ''),
+          el('div', { class: 'note' }, o.text),
+          el('button', { type: 'button', class: 'btn btn-small', onclick: () => highlight(o.id, '', 'guide') }, t('pbShowMe'))))),
+        el('p', { class: 'note' }, t('pbPickYourself'))] : [el('p', { class: 'note' }, t('pbNoOptions'))]));
+      say(top.length ? t('pbPickYourself') : t('pbNoOptions'));
+    };
+    setCard('',
+      el('p', { class: 'eyebrow' }, '💬 ' + t('pbPrefTitle')),
+      el('p', { class: 'instruction', id: 'pb-text' }, step.text),
+      el('div', { class: 'stack' }, by, win, el('label', {}, nonstop, ' ' + t('pbNonstop')), max),
+      el('div', { class: 'row' }, el('button', { type: 'button', class: 'btn btn-primary', id: 'pb-show', onclick: show }, t('pbShowBest'))),
+      out, offersBlock(s, step), pbNav(s, step), sourceNote('local'));
+    say(step.text);
+  }
+
+  function renderExtras(s, step, found) {
+    setCard('',
+      el('p', { class: 'eyebrow' }, '🛡️ ' + t('modeGuide')),
+      el('p', { class: 'instruction', id: 'pb-text' }, step.text),
+      step.keys && !found ? el('p', { class: 'note' }, t('pbNotFound')) : null,
+      el('div', { class: 'row' },
+        el('button', { type: 'button', class: 'btn btn-secondary', id: 'pb-where', onclick: async () => { const r = await sendSafe({ type: 'WS_FIND', keys: step.keys }); if (r && r.ok) highlight(r.id, step.text, 'guide'); } }, t('pbShowExtras')),
+        el('button', { type: 'button', class: 'btn btn-primary', id: 'pb-next', onclick: () => pbGo(s) }, t('pbSkipExtras'))),
+      pbNavSmall(s, step), sourceNote('local'));
+    say(step.text);
+  }
+
+  function renderCoupon(s, step, found) {
+    const applyCode = async (code) => {
+      const r1 = await sendSafe({ type: 'WS_FILL_KEYS', keys: step.keys, value: code, confirmed: true });
+      if (!(r1 && r1.ok)) {
+        setCard('card-error', el('p', { class: 'instruction', id: 'pb-text' }, t('pbCantType')), el('p', { class: 'value-preview' }, code), pbNav(s, step));
+        return;
+      }
+      const r2 = await sendSafe({ type: 'WS_CLICK_KEYS', keys: step.applyKeys, confirmed: true });
+      setCard(r2 && r2.ok ? 'card-done' : 'card-error',
+        el('p', { class: 'instruction', id: 'pb-text' }, r2 && r2.ok ? '✓ ' + t('pbApplied') : t('pbCantType')),
+        el('p', { class: 'value-preview' }, code), pbNav(s, step));
+      say(r2 && r2.ok ? t('pbApplied') : t('pbCantType'));
+    };
+    const confirmCode = (code) => {
+      setCard('card-confirm',
+        el('p', { class: 'eyebrow' }, '🔎 ' + t('confirmTitle')),
+        el('p', { class: 'instruction', id: 'pb-text' }, t('pbApplyAsk')),
+        el('p', { class: 'value-preview' }, code),
+        el('div', { class: 'row' },
+          el('button', { type: 'button', class: 'btn btn-primary', id: 'confirm-yes', onclick: () => applyCode(code) }, '✓ ' + t('pbYesApply')),
+          el('button', { type: 'button', class: 'btn btn-secondary', onclick: () => renderCoupon(s, step, found) }, t('change'))));
+      $('#confirm-yes').focus();
+    };
+    const haveCode = () => {
+      const input = el('input', { id: 'answer', type: 'text', 'aria-label': t('pbCodeLabel'), placeholder: t('pbCodeLabel'), autocomplete: 'off' });
+      setCard('', el('p', { class: 'instruction', id: 'pb-text' }, t('pbCodeLabel')),
+        el('form', { onsubmit: (e) => { e.preventDefault(); const c = input.value.trim().toUpperCase(); if (/^[A-Z0-9]{3,20}$/.test(c)) confirmCode(c); else $('#answer-msg').textContent = t('typeAnswer'); } },
+          input, el('div', { class: 'row' }, el('button', { type: 'submit', class: 'btn btn-primary' }, t('next')))),
+        el('p', { class: 'msg', id: 'answer-msg', role: 'status' }), pbNav(s, step));
+      input.focus();
+    };
+    const showOffers = async () => {
+      const r = await sendSafe({ type: 'WS_STAGE' });
+      const offers = (r && r.offers) || [];
+      setCard('',
+        el('p', { class: 'eyebrow' }, '🏷️ ' + t('pbOffersTitle')),
+        offers.length ? el('ul', { class: 'offer-list' }, offers.map((o) => el('li', {},
+          el('strong', {}, o.code), o.text ? ' — ' + o.text : '',
+          el('div', { class: 'note' }, WS.playbooks.offerHints(o.text).map((h) => t('pbHint' + h)).join(' ')),
+          el('button', { type: 'button', class: 'btn btn-small', onclick: () => confirmCode(o.code) }, t('pbUseCode'))))) : el('p', { class: 'note' }, t('pbNoOffers')),
+        el('p', { class: 'note' }, t('pbOffersNote')), pbNav(s, step));
+    };
+    setCard('',
+      el('p', { class: 'eyebrow' }, '🏷️ ' + t('modeAssist')),
+      el('p', { class: 'instruction', id: 'pb-text' }, step.text),
+      el('p', { class: 'instruction' }, t('pbCouponHave')),
+      step.keys && !found ? el('p', { class: 'note' }, t('pbNotFound')) : null,
+      el('div', { class: 'row' },
+        el('button', { type: 'button', class: 'btn btn-primary', id: 'pb-yes', onclick: haveCode }, t('pbYesCoupon')),
+        el('button', { type: 'button', class: 'btn btn-secondary', id: 'pb-no', onclick: showOffers }, t('pbNoCoupon'))),
+      pbNavSmall(s, step), sourceNote('local'));
+    say(t('pbCouponHave'));
   }
   const step_ = (force) => step(force); // the playbook card has its own local named "step"
 

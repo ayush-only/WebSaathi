@@ -33,24 +33,32 @@
       kn: 'ಒನ್ ವೇ ಅಥವಾ ರೌಂಡ್ ಟ್ರಿಪ್ ಆರಿಸಿ.'
     },
     from: {
+      ask: 'text',
+      q: { en: 'Where are you leaving from? (city)', hi: 'आप कहाँ से जा रहे हैं? (शहर)', kn: 'ನೀವು ಎಲ್ಲಿಂದ ಹೊರಡುತ್ತಿದ್ದೀರಿ? (ನಗರ)' },
       keys: ['from', 'leaving from', 'origin'],
       en: 'Set where you are travelling FROM. Click here and type the city.',
       hi: 'आप कहाँ से यात्रा कर रहे हैं (FROM) वह चुनें। यहाँ क्लिक करके शहर लिखें।',
       kn: 'ನೀವು ಎಲ್ಲಿಂದ ಪ್ರಯಾಣಿಸುತ್ತಿದ್ದೀರಿ (FROM) ಎಂದು ಹೊಂದಿಸಿ. ಇಲ್ಲಿ ಕ್ಲಿಕ್ ಮಾಡಿ ನಗರ ಟೈಪ್ ಮಾಡಿ.'
     },
     to: {
+      ask: 'text',
+      q: { en: 'Where are you going? (city)', hi: 'आप कहाँ जा रहे हैं? (शहर)', kn: 'ನೀವು ಎಲ್ಲಿಗೆ ಹೋಗುತ್ತಿದ್ದೀರಿ? (ನಗರ)' },
       keys: ['to', 'destination', 'going to'],
       en: 'Set where you are going TO. Click here and type the city.',
       hi: 'आप कहाँ जा रहे हैं (TO) वह चुनें। यहाँ क्लिक करके शहर लिखें।',
       kn: 'ನೀವು ಎಲ್ಲಿಗೆ ಹೋಗುತ್ತಿದ್ದೀರಿ (TO) ಎಂದು ಹೊಂದಿಸಿ. ಇಲ್ಲಿ ಕ್ಲಿಕ್ ಮಾಡಿ ನಗರ ಟೈಪ್ ಮಾಡಿ.'
     },
     date: {
+      ask: 'date',
+      q: { en: 'Which date do you want to travel? (for example 26 Nov, or “tomorrow”)', hi: 'किस तारीख को यात्रा करनी है? (जैसे 26 Nov, या “कल”)', kn: 'ಯಾವ ದಿನಾಂಕದಂದು ಪ್ರಯಾಣ? (ಉದಾ. 26 Nov, ಅಥವಾ “ನಾಳೆ”)' },
       keys: ['departure', 'depart', 'journey date', 'travel date', 'date'],
       en: 'Pick your travel date from the calendar.',
       hi: 'कैलेंडर से यात्रा की तारीख चुनें।',
       kn: 'ಕ್ಯಾಲೆಂಡರ್‌ನಿಂದ ಪ್ರಯಾಣದ ದಿನಾಂಕ ಆರಿಸಿ.'
     },
     travellers: {
+      ask: 'count',
+      q: { en: 'How many people are travelling?', hi: 'कितने लोग यात्रा कर रहे हैं?', kn: 'ಎಷ್ಟು ಜನ ಪ್ರಯಾಣಿಸುತ್ತಿದ್ದಾರೆ?' },
       keys: ['travellers', 'travelers', 'passengers', 'adults'],
       en: 'Set how many people are travelling.',
       hi: 'कितने लोग यात्रा कर रहे हैं, यह चुनें।',
@@ -99,6 +107,8 @@
       kn: 'ನಿಮ್ಮ 10 ಅಂಕಿಯ PNR ಸಂಖ್ಯೆ ಟೈಪ್ ಮಾಡಿ.'
     },
     search: {
+      act: 'click',
+      clickKeys: ['search flights', 'search buses', 'search hotels', 'search trains', 'search'],
       keys: ['search flights', 'search buses', 'search hotels', 'search trains', 'find trains', 'get status', 'check status', 'search'],
       button: true,
       final: true,
@@ -132,6 +142,21 @@
       en: 'Travellers: if you have saved travellers, tick the right one. Otherwise tap “Add new adult/traveller” and type the name exactly as on the ID. Then check the mobile number and email, and un-tick extras you do not want (insurance, protection).',
       hi: 'यात्री: अगर सेव किए हुए यात्री हैं तो सही वाले को टिक करें। नहीं तो “Add new adult/traveller” दबाएँ और नाम ठीक वैसे लिखें जैसे पहचान-पत्र पर है। फिर मोबाइल नंबर और ईमेल जाँचें, और जो अतिरिक्त चीज़ें नहीं चाहिए (बीमा, प्रोटेक्शन) उन्हें अनटिक करें।',
       kn: 'ಪ್ರಯಾಣಿಕರು: ಉಳಿಸಿದ ಪ್ರಯಾಣಿಕರಿದ್ದರೆ ಸರಿಯಾದವರನ್ನು ಟಿಕ್ ಮಾಡಿ. ಇಲ್ಲದಿದ್ದರೆ “Add new adult/traveller” ಒತ್ತಿ ಮತ್ತು ಹೆಸರನ್ನು ಗುರುತಿನ ಚೀಟಿಯಲ್ಲಿರುವಂತೆಯೇ ಟೈಪ್ ಮಾಡಿ. ನಂತರ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಮತ್ತು ಇಮೇಲ್ ಪರಿಶೀಲಿಸಿ, ಬೇಡದ ಹೆಚ್ಚುವರಿಗಳನ್ನು (ವಿಮೆ, ಪ್ರೊಟೆಕ್ಷನ್) ಅನ್‌ಟಿಕ್ ಮಾಡಿ.'
+    },
+    lock: {
+      keys: ['price drop protection', 'lock this price', 'lock price', 'trip secure', 'add-ons', 'add ons'],
+      ask: 'choice',
+      en: 'Extras: some sites offer to lock the price or add protection or insurance. They cost extra and most people do not need them. Tick one only if you really want it.',
+      hi: 'अतिरिक्त चीज़ें: कुछ साइटें कीमत लॉक करने या प्रोटेक्शन/बीमा जोड़ने को कहती हैं। इनके पैसे अलग लगते हैं और ज़्यादातर लोगों को ज़रूरत नहीं होती। सच में चाहिए तभी टिक करें।',
+      kn: 'ಹೆಚ್ಚುವರಿಗಳು: ಕೆಲವು ತಾಣಗಳು ಬೆಲೆ ಲಾಕ್ ಮಾಡಲು ಅಥವಾ ರಕ್ಷಣೆ/ವಿಮೆ ಸೇರಿಸಲು ಕೇಳುತ್ತವೆ. ಇವಕ್ಕೆ ಹೆಚ್ಚುವರಿ ಹಣ ಬೇಕು, ಹೆಚ್ಚಿನವರಿಗೆ ಬೇಕಾಗುವುದಿಲ್ಲ. ನಿಜವಾಗಿ ಬೇಕಾದರೆ ಮಾತ್ರ ಟಿಕ್ ಮಾಡಿ.'
+    },
+    coupon: {
+      keys: ['enter coupon code', 'coupon code', 'promo code', 'have a coupon', 'coupons and offers', 'coupon'],
+      ask: 'coupon',
+      applyKeys: ['apply coupon', 'apply code', 'apply'],
+      en: 'Coupons: do you have a coupon code? If not, I will show the offers this site already lists.',
+      hi: 'कूपन: क्या आपके पास कूपन कोड है? नहीं है तो मैं वे ऑफ़र दिखाऊँगा जो साइट पर पहले से दिख रहे हैं।',
+      kn: 'ಕೂಪನ್: ನಿಮ್ಮ ಬಳಿ ಕೂಪನ್ ಕೋಡ್ ಇದೆಯೇ? ಇಲ್ಲದಿದ್ದರೆ ಈ ತಾಣದಲ್ಲಿ ಈಗಾಗಲೇ ಕಾಣುವ ಆಫರ್‌ಗಳನ್ನು ತೋರಿಸುತ್ತೇನೆ.'
     },
     review: {
       en: 'Check the total price, dates and names once more before you continue.',
@@ -171,10 +196,10 @@
 
   /** Task id (see shared/intents.js) → ordered step ids. Tasks not listed here use the form walker. */
   const TASK_STEPS = {
-    book_flight: ['tripType', 'from', 'to', 'date', 'travellers', 'search', 'resultsFlight', 'details', 'review', 'pay'],
-    book_train: ['login', 'from', 'to', 'date', 'class', 'search', 'resultsTrain', 'details', 'review', 'pay'],
-    book_bus: ['from', 'to', 'date', 'search', 'resultsBus', 'details', 'review', 'pay'],
-    book_hotel: ['city', 'checkin', 'checkout', 'guests', 'search', 'resultsHotel', 'details', 'review', 'pay'],
+    book_flight: ['tripType', 'from', 'to', 'date', 'travellers', 'search', 'resultsFlight', 'details', 'lock', 'coupon', 'review', 'pay'],
+    book_train: ['login', 'from', 'to', 'date', 'class', 'search', 'resultsTrain', 'details', 'coupon', 'review', 'pay'],
+    book_bus: ['from', 'to', 'date', 'search', 'resultsBus', 'details', 'coupon', 'review', 'pay'],
+    book_hotel: ['city', 'checkin', 'checkout', 'guests', 'search', 'resultsHotel', 'details', 'coupon', 'review', 'pay'],
     status_pnr: ['pnr', 'search'],
     status_train: ['trainNo', 'search'],
     cancel_ticket: ['login', 'manage', 'findBooking', 'cancelBtn', 'refundCheck']
@@ -188,9 +213,70 @@
     const ids = TASK_STEPS[taskId];
     return ids.map((id, i) => {
       const s = STEPS[id];
-      return { id, text: s[lang] || s.en, keys: s.keys || null, button: !!s.button, final: !!s.final, index: i, total: ids.length };
+      return { id, text: s[lang] || s.en, keys: s.keys || null, button: !!s.button, final: !!s.final, index: i, total: ids.length,
+        ask: s.ask || null, q: s.q ? (s.q[lang] || s.q.en) : null, act: s.act || null, clickKeys: s.clickKeys || null, applyKeys: s.applyKeys || null };
     });
   }
 
-  return { STEPS, TASK_STEPS, has, stepsFor };
+
+  // ---------------------------------------------------------------- pure helpers (unit-tested)
+  const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const pad2 = (n) => String(n).padStart(2, '0');
+
+  /**
+   * "26 Nov", "26/11", "26-11-2026", "tomorrow", "kal", "aaj" → {iso, display}. A date already past this year rolls to next year.
+   * @param {string} text @param {Date} [now]
+   */
+  function parseDate(text, now) {
+    const t = String(text || '').trim().toLowerCase();
+    const base = now ? new Date(now) : new Date();
+    base.setHours(12, 0, 0, 0);
+    const out = (d) => ({ iso: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`, display: `${d.getDate()} ${MONTHS[d.getMonth()][0].toUpperCase()}${MONTHS[d.getMonth()].slice(1)} ${d.getFullYear()}` });
+    if (/^(today|aaj|आज|ಇಂದು)$/.test(t)) return out(base);
+    if (/^(tomorrow|kal|कल|ನಾಳೆ)$/.test(t)) { base.setDate(base.getDate() + 1); return out(base); }
+    let d = null, m = t.match(/^(\d{1,2})[\s/.-]+([a-z]{3})[a-z]*\.?(?:[\s/.-]+(\d{2,4}))?$/);
+    let day, mon, yr;
+    if (m && MONTHS.includes(m[2])) { day = +m[1]; mon = MONTHS.indexOf(m[2]); yr = m[3]; }
+    else if ((m = t.match(/^(\d{1,2})[\s/.-]+(\d{1,2})(?:[\s/.-]+(\d{2,4}))?$/))) { day = +m[1]; mon = +m[2] - 1; yr = m[3]; }
+    else if ((m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/))) { day = +m[3]; mon = +m[2] - 1; yr = m[1]; }
+    else return null;
+    if (mon < 0 || mon > 11 || day < 1 || day > 31) return null;
+    let year = yr ? (yr.length === 2 ? 2000 + +yr : +yr) : base.getFullYear();
+    d = new Date(year, mon, day, 12);
+    if (d.getMonth() !== mon) return null;
+    if (!yr && d < new Date(base.getFullYear(), base.getMonth(), base.getDate())) d = new Date(year + 1, mon, day, 12);
+    return out(d);
+  }
+
+  const toMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || ''); return m ? +m[1] * 60 + +m[2] : null; };
+
+  /**
+   * Rank result cards for what the user said matters. pref: { by:'cheapest'|'fastest'|'earliest', maxPrice?:number,
+   * nonstop?:boolean, window?:'morning'|'afternoon'|'evening'|'any' }. Returns up to `n` options, best first, each with `why`.
+   */
+  function rankOptions(options, pref, n) {
+    const p = pref || {};
+    let list = (options || []).filter((o) => o && Number.isFinite(o.price));
+    if (p.maxPrice) list = list.filter((o) => o.price <= p.maxPrice);
+    if (p.nonstop) list = list.filter((o) => o.stops === 0);
+    const win = { morning: [300, 719], afternoon: [720, 1019], evening: [1020, 1439] }[p.window];
+    if (win) list = list.filter((o) => { const m = toMin(o.depart); return m !== null && m >= win[0] && m <= win[1]; });
+    const key = p.by === 'fastest' ? (o) => (o.minutes == null ? 1e9 : o.minutes) : p.by === 'earliest' ? (o) => (toMin(o.depart) == null ? 1e9 : toMin(o.depart)) : (o) => o.price;
+    const sorted = list.slice().sort((a, b) => key(a) - key(b) || a.price - b.price);
+    return sorted.slice(0, n || 3).map((o, i) => Object.assign({}, o, { rank: i + 1 }));
+  }
+
+  /** What kind of condition an offer line hints at. The site's own terms always win, so this only points the user at them. */
+  function offerHints(text) {
+    const t = String(text || '');
+    const out = [];
+    if (/\b(card|credit|debit|icici|hdfc|sbi|axis|kotak|bank)\b/i.test(t)) out.push('card');
+    if (/\b(min(imum)?|above|on bookings? of|orders? above)\b/i.test(t)) out.push('min');
+    if (/\b(upi|wallet|paytm|phonepe|gpay)\b/i.test(t)) out.push('upi');
+    if (/\b(first|new user|new customer)\b/i.test(t)) out.push('first');
+    if (!out.length) out.push('generic');
+    return out;
+  }
+
+  return { STEPS, TASK_STEPS, has, stepsFor, parseDate, rankOptions, offerHints };
 });

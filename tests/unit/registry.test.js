@@ -36,8 +36,8 @@ test('navigation is allowed only to exact registry origins over https', () => {
   assert.equal(registry.checkNavigation('not a url').reason, 'INVALID_URL');
 });
 
-test('only the local demo allows Assist Mode; every real portal is guide-only', () => {
-  for (const p of registry.PORTALS) assert.equal(p.policy, p.demo ? 'assist' : 'guide-only', p.id);
+test('Assist Mode only on the local demo and private travel sites; government and railway portals stay guide-only', () => {
+  for (const p of registry.PORTALS) assert.equal(p.policy, p.demo || p.kind === 'travel' ? 'assist' : 'guide-only', p.id);
   assert.equal(registry.portalForOrigin('https://www.irctc.co.in').policy, 'guide-only');
   assert.equal(registry.portalForOrigin('http://localhost:5500').id, 'demo');
   assert.equal(registry.portalForOrigin('http://localhost:8787'), null);

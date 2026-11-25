@@ -47,3 +47,23 @@ test('on real sites the form walker skips unlabeled boxes and tick-boxes (promos
   const r2 = planner.nextAction(scan, { mode: 'guide', lang: 'en', policy: 'assist' });
   assert.equal(r2.action.targetElementId, 'a');
 });
+
+test('parseDate understands typed and spoken dates; rankOptions follows what the user cares about; offer hints point at conditions', () => {
+  const now = new Date('2026-11-25T10:00:00');
+  assert.deepEqual(playbooks.parseDate('26 Nov', now), { iso: '2026-11-26', display: '26 Nov 2026' });
+  assert.equal(playbooks.parseDate('tomorrow', now).iso, '2026-11-26');
+  assert.equal(playbooks.parseDate('5/1', now).iso, '2027-01-05');
+  assert.equal(playbooks.parseDate('31 Feb', now), null);
+  assert.equal(playbooks.parseDate('whenever', now), null);
+  const opts = [
+    { price: 4512, depart: '11:10', stops: 0, minutes: 170 },
+    { price: 4102, depart: '06:00', stops: 1, minutes: 330 },
+    { price: 5230, depart: '19:00', stops: 0, minutes: 165 }];
+  assert.deepEqual(playbooks.rankOptions(opts, { by: 'cheapest' }, 3).map((o) => o.price), [4102, 4512, 5230]);
+  assert.equal(playbooks.rankOptions(opts, { by: 'fastest' }, 1)[0].price, 5230);
+  assert.deepEqual(playbooks.rankOptions(opts, { by: 'cheapest', nonstop: true }, 3).map((o) => o.price), [4512, 5230]);
+  assert.deepEqual(playbooks.rankOptions(opts, { by: 'cheapest', window: 'evening' }, 3).map((o) => o.price), [5230]);
+  assert.deepEqual(playbooks.rankOptions(opts, { by: 'cheapest', maxPrice: 4300 }, 3).map((o) => o.price), [4102]);
+  assert.deepEqual(playbooks.offerHints('₹1,143 off on ICICI Bank cards, minimum booking ₹5,000'), ['card', 'min']);
+  assert.deepEqual(playbooks.offerHints('instant discount of ₹417'), ['generic']);
+});

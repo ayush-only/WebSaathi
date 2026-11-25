@@ -62,7 +62,7 @@ test('banking and other uncovered topics are reported as unsupported, not routed
   assert.equal(intents.match('').kind, 'none');
 });
 
-test('every task points only at registry portals, official site first, and is guide-only for real sites', () => {
+test('every task points only at registry portals, official site first, and is guide-only for government and railway sites', () => {
   for (const task of intents.TASKS) {
     assert.ok(task.portals.length, task.id);
     for (const l of ['en', 'hi', 'kn']) {
@@ -71,7 +71,7 @@ test('every task points only at registry portals, official site first, and is gu
     }
     for (const o of intents.optionsFor(task)) {
       assert.ok(o.portal, task.id);
-      assert.equal(o.level, o.portal.demo ? 'assist' : 'guide');
+      assert.equal(o.level, o.portal.demo || o.portal.kind === 'travel' ? 'assist' : 'guide');
     }
   }
   assert.equal(intents.optionsFor(intents.getTask('book_train'))[0].portal.id, 'irctc');

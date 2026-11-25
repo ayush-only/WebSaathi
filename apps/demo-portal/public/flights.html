@@ -32,7 +32,19 @@
       <div class="promo"><input type="checkbox" id="promo"><span>Add Price Drop Protection</span></div>
       <div class="app"><span>Get the app link</span><input type="text" placeholder="Enter Mobile number"></div>
       <div class="search" id="search" role="button" tabindex="0">SEARCH</div>
+      <p id="searched" hidden></p>
     </section>
   </main>
+<script>
+  // Practice behaviour like real sites: tapping a card opens a small box to type into; SEARCH goes to the results page.
+  document.querySelectorAll('.card').forEach((card) => card.addEventListener('click', () => {
+    if (document.getElementById('pop')) document.getElementById('pop').remove();
+    const pop = document.createElement('div'); pop.id = 'pop'; pop.style.cssText = 'position:fixed;left:20px;top:140px;background:#fff;border:2px solid #333;padding:10px;z-index:5';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.placeholder = 'Type here'; inp.setAttribute('aria-label', 'popup ' + card.querySelector('.lbl').textContent);
+    inp.addEventListener('input', () => { card.querySelector('strong').textContent = inp.value; });
+    pop.append(inp); document.body.append(pop); inp.focus();
+  }));
+  document.getElementById('search').addEventListener('click', () => { window.__searched = true; location.href = 'flights-results.html'; });
+</script>
 </body>
 </html>

@@ -44,7 +44,7 @@ Original portals and the demo have an always-on content script. The newer sites 
 |---|---|
 | `https://www.irctc.co.in`, `https://enquiry.indianrail.gov.in` (NTES), `https://railmadad.indianrailways.gov.in` | guide-only |
 | `https://consumerhelpline.gov.in`, `https://pgportal.gov.in`, `https://airsewa.gov.in` (+ `www.` variants where listed in the registry) | guide-only |
-| `https://www.makemytrip.com`, `https://www.goibibo.com`, `https://www.yatra.com`, `https://www.ixigo.com`, `https://www.redbus.in` (private companies) | guide-only |
+| `https://www.makemytrip.com`, `https://www.goibibo.com`, `https://www.yatra.com`, `https://www.ixigo.com`, `https://www.redbus.in` (private companies) | assist (every fill and click needs the user's confirmation; Guide Mode is one tap away) |
 | `http://localhost:5500`, `http://127.0.0.1:5500` (demo) | assist |
 | anything else (including payment sub-domains of the travel sites) | unsupported — content script stays inactive |
 
@@ -52,5 +52,18 @@ Original portals and the demo have an always-on content script. The newer sites 
 
 On a playbook session the panel asks the page for its **stage** (`WS_STAGE`): `form`, `results`, `details` or `pay`, decided from the address and visible headings only. When the page has moved ahead of the current step, the playbook moves with it (the Back button turns that off until the user presses Next). On results and traveller pages it also reads the **public offer text** (a code plus a short line, for example `MMTSECURE — ₹417 off`), shows up to four in the panel, and reminds the user to type a code themselves; it never applies one. The traveller step highlights "Add new adult/traveller" and explains choosing a saved traveller or adding one with the name exactly as on the ID. At payment the playbook hands off. Field values are never read.
 
-On real (guide-only) sites the on-page highlight is a thin outline with no dimming and no floating tip, so it cannot cover the site's own dropdowns and popups; the words are in the side panel. The practice pages are `flights.html`, `flights-results.html`, `flights-details.html` and `flights-pay.html`.
+On real sites the on-page highlight is a thin outline with no dimming and no floating tip, so it cannot cover the site's own dropdowns and popups; the words are in the side panel. The practice pages are `flights.html`, `flights-results.html`, `flights-details.html` and `flights-pay.html`.
+
+### Assist on travel sites (ask → confirm → do)
+
+Private travel sites use `policy: 'assist'`; government and railway sites stay guide-only (IRCTC's terms prohibit automation, and WebSaathi never submits to a real service). In Assist Mode a playbook step can **ask**, then **confirm**, then act:
+
+1. **Search form.** The panel asks "Where are you leaving from?", then To, date ("26 Nov", "tomorrow") and travellers, by typing or voice. It shows "Type “Pune” into the from box?" and only types after **Yes**. A custom widget (a "From" card) is opened the way a person would, then typed into (`WS_FILL_KEYS`). If the site's widget cannot be typed into, the panel says so and the user does that step; the user taps any suggestion the site shows.
+2. **Search.** The panel asks "Shall I press SEARCH?" and presses it after **Yes** (`WS_CLICK_KEYS`, new action `CLICK_ELEMENT`).
+3. **Results.** The panel asks what matters (cheapest, fastest, earliest, non-stop, time of day, highest price), reads the visible result cards (price, times, stops; `WS_RESULTS`) and shows the best three with a **Show me** button. The user clicks the flight.
+4. **Extras.** It explains price-lock and add-ons and points at them; the user ticks any. WebSaathi never ticks them.
+5. **Coupon.** "Do you have a coupon code?" Yes: typed into the coupon box and APPLY pressed after a confirm. No: the offers the page already lists are shown with a plain note of when each tends to work (bank card, minimum amount, UPI/wallet, first booking) and **Use this code**.
+6. **Payment.** The playbook stops and hands off.
+
+**Hard limits in `safety.js`:** `CLICK_ELEMENT` is allowed only on `assist` sites, only after confirmation, only for buttons labelled Search or Apply, and any label containing pay, OTP, password, UPI, card, net banking, wallet, book now, continue, proceed, confirm, submit, cancel or log in is refused. Sensitive fields (password, OTP, card, ID numbers) are always a human hand-off. `fill()` re-validates in the page right before writing.
 

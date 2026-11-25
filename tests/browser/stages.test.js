@@ -49,7 +49,7 @@ test('panel follows results → travellers → payment', { skip: exe ? false : '
   await t.test('results page: jumps to the results step and lists offers', async () => {
     await panel.click('#help-page');
     await stepText(panel, /total price.*refundable/);
-    assert.match(await panel.textContent('#progress-text'), /Step 7 of 10/);
+    assert.match(await panel.textContent('#progress-text'), /Step 7 of 12/);
     const offers = await panel.textContent('.offers');
     assert.match(offers, /MMTSECURE/);
     assert.match(offers, /yourself/);
@@ -58,13 +58,13 @@ test('panel follows results → travellers → payment', { skip: exe ? false : '
   await t.test('traveller page: choose or add a traveller', async () => {
     await page.goto(DEMO_URL + 'flights-details.html');
     await stepText(panel, /Add new adult/);
-    assert.match(await panel.textContent('#progress-text'), /Step 8 of 10/);
+    assert.match(await panel.textContent('#progress-text'), /Step 8 of 12/);
   });
 
   await t.test('payment page: hands off', async () => {
     await page.goto(DEMO_URL + 'flights-pay.html');
     await stepText(panel, /At payment I stop/);
-    assert.match(await panel.textContent('#progress-text'), /Step 10 of 10/);
+    assert.match(await panel.textContent('#progress-text'), /Step 12 of 12/);
   });
 
   await t.test('no literal "null" in the card and nothing was clicked', async () => {
