@@ -109,4 +109,17 @@ test('assist flow on the practice flight pages', { skip: exe ? false : 'Chrome n
     assert.equal(await page.evaluate(() => window.__applied), 'MMTSECURE');
     assert.equal(await page.evaluate(() => window.__paid || false), false, 'payment is never touched');
   });
+
+  await t.test('finds text split across elements, and ignores a target hidden behind a site popup', async () => {
+    const probe2 = await context.newPage();
+    await probe2.goto(panelUrl);
+    const find = (keys) => probe2.evaluate(([id, k]) => chrome.tabs.sendMessage(id, { type: 'WS_FIND', keys: k }), [tabId, keys]);
+    await page.goto(DEMO_URL + 'flights-details.html');
+    assert.equal((await find(['price drop protection'])).ok, true, 'split text "Add Price Drop Protection at ₹ 349"');
+    await page.evaluate(() => { const m = document.createElement('div'); m.id = 'modal'; m.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9999'; m.textContent = 'Flight Details and Fare Options'; document.body.append(m); });
+    assert.equal((await find(['price drop protection'])).ok, false, 'covered by a modal: not pointed at');
+    await page.evaluate(() => document.getElementById('modal').remove());
+    assert.equal((await find(['price drop protection'])).ok, true);
+    await probe2.close();
+  });
 });

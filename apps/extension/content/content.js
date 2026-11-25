@@ -238,6 +238,21 @@
    * Matches only short visible text / aria-label / placeholder — never field values — and returns an
    * id the side panel can ask us to highlight. Nothing is clicked, typed or read out of the page.
    */
+
+  /** True when the element is really visible to the user: not hidden behind a site popup or modal. */
+  function onTop(el) {
+    if (!el || !el.isConnected) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return false;
+    const pts = [[.5, .5], [.15, .5], [.85, .5], [.5, .2], [.5, .8]];
+    return pts.some(([fx, fy]) => {
+      const x = r.left + r.width * fx; const y = r.top + r.height * fy;
+      if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;
+      const top = document.elementFromPoint(x, y);
+      return !!top && (top === el || el.contains(top) || top.contains(el));
+    });
+  }
+
   function findByLabel(keys, preferButton) {
     const wanted = (Array.isArray(keys) ? keys : []).map((k) => String(k).toLowerCase()).filter(Boolean).slice(0, 12);
     if (!wanted.length) return null;
@@ -246,10 +261,11 @@
     for (const el of nodes) {
       if (el.closest('websaathi-overlay') || !isVisible(el)) continue;
       const own = Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.textContent).join(' ');
-      const texts = [own, el.getAttribute('aria-label'), el.tagName === 'INPUT' ? el.getAttribute('placeholder') : ''];
+      const whole = el.children.length <= 4 && el.tagName !== 'INPUT' ? el.innerText : '';
+      const texts = [own, el.getAttribute('aria-label'), el.tagName === 'INPUT' ? el.getAttribute('placeholder') : '', whole];
       for (const raw of texts) {
         const txt = clean(raw, 60).toLowerCase().replace(/[:*]+$/, '').trim();
-        if (!txt || txt.length > 40) continue;
+        if (!txt || txt.length > 60) continue;
         let score = 0;
         for (let i = 0; i < wanted.length; i++) {
           const kw = wanted[i];
@@ -259,6 +275,7 @@
           else if (kw.length > 3 && new RegExp('(^|[^a-z])' + kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z]|$)').test(txt)) score = Math.max(score, 3 + bonus);
         }
         if (!score) continue;
+        if (!onTop(el)) score -= 6; // behind a popup: not what the user can see
         const interactive = el.closest('button,[role="button"],a,input,label,[tabindex]');
         if (interactive) score += preferButton ? 3 : 1;
         else if (preferButton) score -= 2;
@@ -461,6 +478,8 @@
     if (!overlay || !target) return;
     if (!target.isConnected) { clearHighlight(); return; }
     const anchor = target.type === 'radio' ? (target.closest('fieldset,[role="radiogroup"]') || target) : target;
+    if (!onTop(anchor)) { overlay.ring.style.visibility = 'hidden'; rafId = requestAnimationFrame(position); return; }
+    overlay.ring.style.visibility = 'visible';
     const r = anchor.getBoundingClientRect();
     const pad = overlay.host.classList.contains('lite') ? 3 : 6;
     Object.assign(overlay.ring.style, { left: r.left - pad + 'px', top: r.top - pad + 'px', width: r.width + pad * 2 + 'px', height: r.height + pad * 2 + 'px' });
