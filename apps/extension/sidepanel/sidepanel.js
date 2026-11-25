@@ -85,6 +85,7 @@
   // Test hook: when the panel is opened as a normal page with ?targetTab=<id> (automated tests only),
   // it works on that tab instead of the active one. The real side panel never has this parameter.
   const forcedTabId = Number(new URLSearchParams(location.search).get('targetTab')) || null;
+  const forcedTask = new URLSearchParams(location.search).get('task') || null; // test hook only, like targetTab
 
   async function activeTab() {
     if (forcedTabId) { try { return await chrome.tabs.get(forcedTabId); } catch (_) { return null; } }
@@ -265,7 +266,8 @@
       portalId: ping.portalId,
       tabId: st.tabId,
       skipped: [], handoffDone: [], explained: [], completed: [],
-      paused: false, current: null, lastKey: '', scan: null, source: 'local', canUndo: false
+      paused: false, current: null, lastKey: '', scan: null, source: 'local', canUndo: false,
+      taskId: forcedTask || (st.taskCtx && st.taskCtx.task.id) || null, pbIndex: 0, skipChooser: false
     };
     renderSiteHeader();
     $('#completed').replaceChildren();
@@ -325,6 +327,15 @@
     let source = 'local';
     const deterministicFirst = ['HUMAN_HANDOFF', 'EXPLAIN_ERROR'].includes(proposal.action.actionType);
 
+    // A chosen task with a playbook follows the task, not "the next empty box on the page".
+    if (!deterministicFirst && s.taskId && WS.playbooks.has(s.taskId)) {
+      const steps = WS.playbooks.stepsFor(s.taskId, st.lang);
+      const step = steps[Math.min(s.pbIndex, steps.length)] || null;
+      const action = { actionType: step ? 'HIGHLIGHT_ELEMENT' : 'COMPLETE_GUIDANCE', targetElementId: null,
+        instruction: step ? step.text : t('allDone'), expectedOrigin: scan.origin, requiresConfirmation: false, riskLevel: 'low', reason: 'playbook' };
+      return { action, decision: 'allow', code: null, meta: { progress: { done: s.pbIndex, total: steps.length } }, source: 'local', playbook: step ? { step, total: steps.length } : null };
+    }
+
     if (!deterministicFirst && WS.api.health.ai) {
       const out = await WS.api.next(scan, Object.assign({ lang: st.lang, task: st.task }, s));
       if (out) {
@@ -369,6 +380,10 @@
       s.scan = scan;
       updateProgress(scan);
       if (!force && userIsAnswering() && indexElements(scan)[s.current.fieldId]) return;
+      if (needsChooser()) {
+        if (force || s.lastKey !== 'chooser') { s.lastKey = 'chooser'; await renderChooser(); }
+        return;
+      }
       const d = await decide(scan);
       const key = [d.action.actionType, d.action.targetElementId, d.action.instruction, d.decision].join('|');
       if (!force && key === s.lastKey) return;
@@ -406,6 +421,7 @@
     const s = st.session;
     const field = d.meta && d.meta.field ? d.meta.field : null;
     s.current = { kind: 'info', fieldId: field ? field.id : null, action: d.action, meta: d.meta, source: d.source };
+    if (d.playbook !== undefined && d.action.reason === 'playbook') return renderPlaybook(d);
 
     if (d.decision === 'block') {
       await highlight(null);
@@ -423,6 +439,69 @@
         say(d.action.instruction);
     }
   }
+
+
+  // ------------------------------------------------------------------ task playbook + chooser
+  function chooserTasks() {
+    const s = st.session;
+    return WS.intents.TASKS.filter((task) => task.portals.includes(s.portalId) && task.category !== 'practice');
+  }
+
+  function needsChooser() {
+    const s = st.session;
+    return !s.taskId && !s.skipChooser && s.policy === 'guide-only' && chooserTasks().length > 0;
+  }
+
+  async function renderChooser() {
+    const s = st.session;
+    await highlight(null);
+    s.current = { kind: 'info' };
+    setCard('',
+      el('p', { class: 'eyebrow' }, '🧭 ' + t('pbChooseTitle')),
+      el('div', { class: 'stack' }, chooserTasks().map((task) =>
+        el('button', { type: 'button', class: 'pick', 'data-task': task.id, onclick: () => { s.taskId = task.id; s.pbIndex = 0; s.lastKey = ''; st.task = task.label.en; step(true); } },
+          el('span', { class: 'ico', 'aria-hidden': 'true' }, task.icon), el('span', {}, label(task.label))))),
+      el('button', { type: 'button', class: 'btn btn-small', onclick: () => { s.skipChooser = true; s.lastKey = ''; step(true); } }, t('pbJustLook')));
+    $('#progress-text').textContent = '';
+    $('#progress-fill').style.width = '0%';
+    say(t('pbChooseTitle'));
+  }
+
+  async function renderPlaybook(d) {
+    const s = st.session;
+    const step = d.playbook && d.playbook.step;
+    if (!step) {
+      await highlight(null);
+      setCard('card-done', el('p', { class: 'instruction' }, '🎉 ' + t('pbDone')), sourceNote('local'));
+      $('#progress-text').textContent = '';
+      say(t('pbDone'));
+      return;
+    }
+    s.current = { kind: 'playbook', fieldId: null, action: d.action, meta: d.meta, source: 'local' };
+    let found = false;
+    if (step.keys) {
+      let r = null;
+      try { r = await send({ type: 'WS_FIND', keys: step.keys, button: step.button }); } catch (_) { r = null; }
+      if (r && r.ok) found = (await highlight(r.id, step.text, 'guide')).ok === true;
+    }
+    if (!found) await highlight(null);
+    $('#progress-text').textContent = `${t('step')} ${step.index + 1} ${t('of')} ${step.total}`;
+    $('#progress-bar').setAttribute('aria-valuemax', String(step.total));
+    $('#progress-bar').setAttribute('aria-valuenow', String(step.index));
+    $('#progress-fill').style.width = Math.round((step.index / step.total) * 100) + '%';
+    const last = step.index === step.total - 1;
+    setCard(step.final ? 'card-confirm' : '',
+      el('p', { class: 'eyebrow' }, (step.final ? '👀 ' : '👉 ') + t('modeGuide')),
+      el('p', { class: 'instruction', id: 'pb-text' }, step.text),
+      step.keys && !found ? el('p', { class: 'note' }, t('pbNotFound')) : null,
+      el('div', { class: 'row' },
+        step.index > 0 ? el('button', { type: 'button', class: 'btn btn-secondary', id: 'pb-back', onclick: () => { s.pbIndex = Math.max(0, s.pbIndex - 1); s.lastKey = ''; step_(true); } }, t('back')) : null,
+        el('button', { type: 'button', class: 'btn btn-primary', id: 'pb-next', onclick: () => { s.pbIndex += 1; s.lastKey = ''; step_(true); } }, last ? t('pbFinish') : t('pbNext'))),
+      sourceNote('local'));
+    $('#pb-next').focus();
+    say(step.text);
+  }
+  const step_ = (force) => step(force); // the playbook card has its own local named "step"
 
   async function renderGuide(d, field) {
     const s = st.session;

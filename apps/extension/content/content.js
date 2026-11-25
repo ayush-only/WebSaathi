@@ -230,6 +230,58 @@
     };
   }
 
+
+  // ---------------------------------------------------------------- find a spot by its visible label
+  /**
+   * Playbook steps ("set FROM", "press Search") point at things by the words people see on the page,
+   * because travel sites build their search boxes from custom widgets, not plain <input>s.
+   * Matches only short visible text / aria-label / placeholder — never field values — and returns an
+   * id the side panel can ask us to highlight. Nothing is clicked, typed or read out of the page.
+   */
+  function findByLabel(keys, preferButton) {
+    const wanted = (Array.isArray(keys) ? keys : []).map((k) => String(k).toLowerCase()).filter(Boolean).slice(0, 12);
+    if (!wanted.length) return null;
+    const nodes = document.querySelectorAll('label,span,div,p,a,button,input,li,td,h1,h2,h3,h4,[role="button"]');
+    let best = null;
+    for (const el of nodes) {
+      if (el.closest('websaathi-overlay') || !isVisible(el)) continue;
+      const own = Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.textContent).join(' ');
+      const texts = [own, el.getAttribute('aria-label'), el.tagName === 'INPUT' ? el.getAttribute('placeholder') : ''];
+      for (const raw of texts) {
+        const txt = clean(raw, 60).toLowerCase().replace(/[:*]+$/, '').trim();
+        if (!txt || txt.length > 40) continue;
+        let score = 0;
+        for (let i = 0; i < wanted.length; i++) {
+          const kw = wanted[i];
+          const bonus = (wanted.length - i) * 0.1; // earlier keywords are the better match
+          if (txt === kw) score = Math.max(score, 10 + bonus);
+          else if (kw.length > 2 && (txt.startsWith(kw + ' ') || txt.startsWith(kw + ':'))) score = Math.max(score, 6 + bonus);
+          else if (kw.length > 3 && new RegExp('(^|[^a-z])' + kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z]|$)').test(txt)) score = Math.max(score, 3 + bonus);
+        }
+        if (!score) continue;
+        const interactive = el.closest('button,[role="button"],a,input,label,[tabindex]');
+        if (interactive) score += preferButton ? 3 : 1;
+        else if (preferButton) score -= 2;
+        const r = el.getBoundingClientRect();
+        if (r.top >= 0 && r.top < window.innerHeight) score += 1; // on screen right now
+        if (!best || score > best.score) best = { el, score, interactive, txt };
+      }
+    }
+    if (!best || best.score < 3) return null;
+    // Frame the whole small card around the label (e.g. "From / Bengaluru"), not just the word.
+    let target = (preferButton && best.interactive) ? best.interactive : best.el;
+    if (!(preferButton && best.interactive)) {
+      for (let i = 0; i < 3; i++) {
+        const p = target.parentElement;
+        if (!p || p === document.body || p === document.documentElement) break;
+        const r = p.getBoundingClientRect();
+        if (textOf(p).length > 90 || r.width > window.innerWidth * 0.6 || r.height > 220) break;
+        target = p;
+      }
+    }
+    return { id: idFor(target), label: best.txt, tag: target.tagName.toLowerCase() };
+  }
+
   // ---------------------------------------------------------------- overlay
   let overlay = null;
   let target = null;
@@ -409,6 +461,11 @@
         case 'WS_SCAN':
           sendResponse({ ok: true, scan: scan() });
           break;
+        case 'WS_FIND': {
+          const found = findByLabel(msg.keys, msg.button === true);
+          sendResponse(found ? { ok: true, id: found.id, label: found.label, tag: found.tag } : { ok: false, code: 'NOT_FOUND' });
+          break;
+        }
         case 'WS_HIGHLIGHT': {
           const el = elById.get(msg.id);
           if (!el || !el.isConnected || !isVisible(el.type === 'radio' ? (radioGroup(el).find(isVisible) || el) : el)) {

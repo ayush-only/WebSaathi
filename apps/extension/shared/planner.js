@@ -108,7 +108,9 @@
     }
 
     // 3. Next empty field.
-    const field = els.find((e) => isField(e) && !e.sensitive && !e.hasValue && !skipped.has(e.id));
+    // On real sites (guide-only) skip unlabeled boxes and tick-boxes: those are promos and pre-ticked add-ons.
+    const walkable = (e) => st.policy === 'assist' || (e.label && e.kind !== 'checkbox');
+    const field = els.find((e) => isField(e) && walkable(e) && !e.sensitive && !e.hasValue && !skipped.has(e.id));
     if (field) {
       if (mode === 'assist' && field.kind !== 'file') {
         return { action: base(scan, { actionType: 'ASK_QUESTION', targetElementId: field.id, instruction: questionFor(field, lang) }),

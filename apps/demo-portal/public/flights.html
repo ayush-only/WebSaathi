@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Practice flight search (not a real airline)</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0; }
+    .card { border: 2px solid #b7bfcc; border-radius: 12px; padding: 12px; background: #fff; cursor: pointer; }
+    .card .lbl { display: block; font-size: 13px; color: #5b6475; }
+    .card strong { display: block; font-size: 20px; }
+    .chips { display: flex; gap: 10px; margin-top: 8px; }
+    .chip { border: 2px solid #2f6f4f; border-radius: 999px; padding: 4px 14px; font-weight: 600; cursor: pointer; }
+    .promo, .app { background: #eef3fb; border-radius: 10px; padding: 12px; margin: 12px 0; display: flex; gap: 10px; align-items: center; }
+    .search { display: inline-block; background: #1b5fbf; color: #fff; font-weight: 800; letter-spacing: .08em; padding: 14px 40px; border-radius: 999px; cursor: pointer; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <div class="demo-notice" role="note"><strong>Practice page.</strong> This is a fake flight search made for testing WebSaathi. It is not an airline or a booking site, and nothing here is sent anywhere.</div>
+  <main>
+    <section>
+      <h2>Flights (practice)</h2>
+      <div class="chips"><span class="chip">One Way</span><span class="chip">Round Trip</span></div>
+      <div class="grid">
+        <div class="card"><span class="lbl">From</span><strong>Bengaluru</strong><span class="lbl">BLR</span></div>
+        <div class="card"><span class="lbl">To</span><strong>New Delhi</strong><span class="lbl">DEL</span></div>
+        <div class="card"><span class="lbl">Departure</span><strong>26 Nov</strong></div>
+        <div class="card"><span class="lbl">Travellers</span><strong>1 Adult</strong></div>
+      </div>
+      <!-- Noise on purpose, like real travel sites: an unlabeled pre-ticked-style add-on and an app-download box. -->
+      <div class="promo"><input type="checkbox" id="promo"><span>Add Price Drop Protection</span></div>
+      <div class="app"><span>Get the app link</span><input type="text" placeholder="Enter Mobile number"></div>
+      <div class="search" id="search" role="button" tabindex="0">SEARCH</div>
+    </section>
+  </main>
+</body>
+</html>
