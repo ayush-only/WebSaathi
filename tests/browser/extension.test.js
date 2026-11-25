@@ -123,7 +123,7 @@ test('extension end-to-end in Local Demo Mode', { skip: exe ? false : 'Chrome no
   await t.test('assist mode fills the real demo form through the UI with confirmation', async () => {
     await panel.click('#help-page');
     await panel.waitForSelector('#screen-session:not([hidden])');
-    assert.match(await panel.textContent('#site-policy'), /Practice site/);
+    assert.match(await panel.textContent('#site-policy'), /Assist Mode/);
     await panel.waitForSelector('#question');
     assert.equal(await panel.textContent('#question'), 'What is your full name?');
 

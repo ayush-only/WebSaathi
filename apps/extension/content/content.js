@@ -214,6 +214,10 @@
       .forEach((n) => {
         if (n.closest('websaathi-overlay') || (n.id && describedBy.has(n.id)) || !isVisible(n)) return;
         const t = textOf(n);
+        // Big commercial sites use alert/aria-live regions for promo tickers and chat bubbles. On real sites
+        // only a message that reads like an error counts as "the website found a problem".
+        const ERRORISH = /\b(error|invalid|failed|failure|incorrect|unable|sorry|required|not (valid|available|allowed|found)|try again|went wrong|please (enter|select|choose|fill|provide))\b/i;
+        if (!(PORTAL && PORTAL.kind === 'demo') && !ERRORISH.test(t)) return;
         if (t && t.length <= 300) push(t, null);
       });
 
