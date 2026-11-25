@@ -54,13 +54,71 @@ test('extension end-to-end in Local Demo Mode', { skip: exe ? false : 'Chrome no
     await panel.selectOption('#lang', 'en');
   });
 
-  await t.test('typed intent routes to the verified official portal (confirmation screen only)', async () => {
+  await t.test('launcher: typed request shows the verified websites it can help on, then a confirmation screen only', async () => {
     await panel.fill('#intent', 'I want to complain about a product that was not refunded');
     await panel.click('#intent-form button[type="submit"]');
+    await panel.waitForSelector('#screen-options:not([hidden])');
+    assert.match(await panel.textContent('#options-title'), /complaint/i);
+    await panel.click('#options-list .opt[data-portal="nch"]');
     await panel.waitForSelector('#screen-route:not([hidden])');
     assert.equal(await panel.textContent('#route-domain'), 'consumerhelpline.gov.in');
-    await panel.click('#route-cancel');
+    await panel.click('#route-cancel'); // back to the options, not the start
+    await panel.waitForSelector('#screen-options:not([hidden])');
+    await panel.click('#options-back');
     await panel.waitForSelector('#screen-home:not([hidden])');
+  });
+
+  await t.test('launcher: category tiles, "which kind?" step, and travel sites are guide-only', async () => {
+    assert.equal(await panel.locator('#category-tiles .task').count(), 4);
+    await panel.click('#category-tiles [data-category="book"]');
+    await panel.waitForSelector('#screen-kinds:not([hidden])');
+    assert.equal(await panel.locator('#kinds-list .pick').count(), 4);
+    await panel.click('#kinds-list [data-task="book_flight"]');
+    await panel.waitForSelector('#screen-options:not([hidden])');
+    const ids = await panel.$$eval('#options-list .opt', (n) => n.map((x) => x.dataset.portal));
+    assert.deepEqual(ids, ['makemytrip', 'goibibo', 'yatra', 'ixigo']);
+    assert.match(await panel.textContent('#options-list'), /Private travel company website/);
+    assert.match(await panel.textContent('#options-list'), /Guide Mode/);
+    assert.doesNotMatch(await panel.textContent('#options-list'), /Practice site: I can fill/);
+    assert.ok(await panel.locator('#ready-list li').count() >= 2);
+    await panel.click('#options-list .opt[data-portal="makemytrip"]');
+    await panel.waitForSelector('#screen-route:not([hidden])');
+    assert.equal(await panel.textContent('#route-domain'), 'www.makemytrip.com');
+    assert.match(await panel.textContent('#route-kind'), /Private travel company/);
+    await panel.click('#route-cancel');
+    await panel.click('#options-back');
+    await panel.waitForSelector('#screen-home:not([hidden])');
+  });
+
+  await t.test('launcher: a vague request asks which kind; a brand name goes first; banking is declined honestly', async () => {
+    await panel.fill('#intent', 'I want to book a ticket');
+    await panel.click('#intent-form button[type="submit"]');
+    await panel.waitForSelector('#screen-kinds:not([hidden])');
+    assert.match(await panel.textContent('#kinds-heard'), /I want to book a ticket/);
+    await panel.click('#screen-kinds [data-go-home]');
+    await panel.fill('#intent', 'book a flight on ixigo');
+    await panel.click('#intent-form button[type="submit"]');
+    await panel.waitForSelector('#screen-options:not([hidden])');
+    assert.equal(await panel.$eval('#options-list .opt', (n) => n.dataset.portal), 'ixigo');
+    await panel.click('#options-back');
+    await panel.fill('#intent', 'transfer money using net banking');
+    await panel.click('#intent-form button[type="submit"]');
+    assert.match(await panel.textContent('#intent-msg'), /Banking is not supported yet/);
+    await panel.waitForSelector('#screen-home:not([hidden])');
+    await panel.fill('#intent', '');
+    await panel.evaluate(() => { document.querySelector('#intent-msg').textContent = ''; });
+  });
+
+  await t.test('launcher works in Hindi', async () => {
+    await panel.selectOption('#lang', 'hi');
+    await panel.fill('#intent', 'ट्रेन कहाँ है');
+    await panel.click('#intent-form button[type="submit"]');
+    await panel.waitForSelector('#screen-options:not([hidden])');
+    assert.match(await panel.textContent('#options-title'), /ट्रेन कहाँ/);
+    assert.equal(await panel.$eval('#options-list .opt', (n) => n.dataset.portal), 'ntes');
+    await panel.click('#options-back');
+    await panel.selectOption('#lang', 'en');
+    await panel.fill('#intent', '');
   });
 
   await t.test('assist mode fills the real demo form through the UI with confirmation', async () => {

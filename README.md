@@ -13,11 +13,12 @@ Ever opened an online form and had to ask someone what to click next? WebSaathi 
 
 ## What you can do
 
+- **Say what you want to do.** Tap, type or speak: book a ticket or stay, make a complaint, check status, or cancel. WebSaathi asks which kind if it is unclear, then lists the verified websites it can guide you on and what to keep ready. Banking is not supported yet, and it says so.
 - **Find an official website.** Type `mujhe consumer complaint karni hai` and WebSaathi shows the National Consumer Helpline address, `consumerhelpline.gov.in`, before you choose to open it.
 - **See what to do next.** Choose **Show me** to highlight where to click or type. WebSaathi explains errors in plain language. **Read aloud** can speak the prompts if your device has a voice for the selected language.
 - **Practise filling a form.** Choose **Help me fill** on the practice form. WebSaathi asks one question at a time and waits for your approval before filling each answer.
 
-WebSaathi provides guidance on IRCTC, RailMadad, the National Consumer Helpline, and CPGRAMS. You handle passwords, one-time codes (OTPs), payments, and final submissions yourself.
+WebSaathi provides guidance (it points and explains, and does not type or click) on IRCTC, NTES, RailMadad, AirSewa, the National Consumer Helpline, CPGRAMS, and the travel sites MakeMyTrip, Goibibo, Yatra, ixigo and redBus. Guidance on these live sites has not been tested against the real pages yet. You handle passwords, one-time codes (OTPs), payments, and final submissions yourself.
 
 ## Try the demo
 

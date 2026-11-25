@@ -21,6 +21,10 @@
 - Sent to the backend (only if you run it): redacted labels/kinds/options/errors of visible controls, the mode, language, and — for answer interpretation — the user's answer to a non-sensitive question.
 - Sent to AWS Bedrock / ElevenLabs: the above, from the backend, under your own AWS/ElevenLabs accounts and their terms.
 
+## New website categories
+
+Private travel sites, AirSewa and NTES are **guide-only** and have host permission without an always-on content script (injected only when the user asks to be guided). Payment and login sub-domains are not in the registry, so WebSaathi goes inactive there and warns when a guided tab leaves a verified origin. Banking is excluded by design: the launcher says it is unsupported rather than routing to a bank.
+
 ## Not production-ready yet
 
 Needed before real users: authenticated backend (per-install tokens), HTTPS deployment, persistent rate limiting and abuse monitoring, Bedrock guardrails, a formal privacy review/policy, native-speaker review of Hindi/Kannada, accessibility audit with real users (screen readers, low vision), and Chrome Web Store review.

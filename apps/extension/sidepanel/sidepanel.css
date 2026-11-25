@@ -107,3 +107,24 @@ textarea, input[type="text"] {
 .done-list li { margin: 2px 0; }
 .foot { font-size: .72rem; color: var(--grey); padding: 10px 14px 16px; border-top: 1px solid var(--line); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---- launcher: kinds, options, checklist ---- */
+.stack { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.plain { list-style: none; padding: 0; }
+.small-h.tight { margin-top: 0; }
+.pick { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; font: inherit; font-weight: 700; font-size: 1rem;
+  padding: 12px; border-radius: 14px; border: 2px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; min-height: 56px; }
+.pick:hover, .pick:focus-visible { border-color: var(--navy); }
+.pick .ico { font-size: 1.4rem; }
+.opt { display: block; width: 100%; text-align: left; font: inherit; padding: 12px; border-radius: 14px; border: 2px solid var(--line);
+  background: #fff; color: var(--ink); cursor: pointer; }
+.opt:hover, .opt:focus-visible { border-color: var(--navy); }
+.opt-top { border-color: var(--green); box-shadow: 0 2px 0 var(--green); }
+.opt .opt-name { display: block; font-weight: 800; font-size: 1rem; }
+.opt .opt-domain { display: block; font: 700 .85rem ui-monospace, "Cascadia Mono", Menlo, monospace; color: var(--navy); margin: 2px 0 6px; word-break: break-all; }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag { font-size: .75rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #f3f4fa; color: var(--navy); border: 1px solid var(--line); }
+.tag-suggested { background: var(--green-soft); border-color: var(--green); color: var(--green); }
+.ready { margin: 0; padding-left: 20px; }
+.ready li { margin: 4px 0; }
+#task-practice { margin-top: 8px; width: 100%; }

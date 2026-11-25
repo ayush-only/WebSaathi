@@ -4,8 +4,9 @@ Setup (before judges arrive): `npm run demo`, Chrome with the extension loaded f
 
 | # | Do | Say |
 |---|---|---|
-| 1 | Show the side panel home, switch language EN → हिन्दी → ಕನ್ನಡ → back | “Same companion in three languages. Big text, one thing at a time.” |
-| 2 | Type *“mujhe consumer complaint karni hai”* → Go | “WebSaathi never lets AI invent a link. It matches a verified registry and shows the real domain — consumerhelpline.gov.in — before opening anything.” |
+| 1 | Show the side panel home (four big tasks: book / complain / status / cancel), switch language EN → हिन्दी → ಕನ್ನಡ → back | “Same companion in three languages. Big text, one thing at a time.” |
+| 1b | Tap **Book a ticket or stay → Flight ticket** (or press 🎤 and say *“book a flight”*) | “You tell it what you want — by tapping, typing or voice. It lists the verified websites it can guide you on, and what to keep ready. Banking? It says honestly: not supported yet.” |
+| 2 | Type *“mujhe consumer complaint karni hai”* → Go → pick the site | “WebSaathi never lets AI invent a link. It matches a verified registry and shows the real domain — consumerhelpline.gov.in — before opening anything.” |
 | 3 | (Optional) Open it → panel says *Guide only on this site* | “On real government sites and IRCTC we only point and explain. No typing, no clicking — IRCTC's terms forbid automation.” Then go back to the demo tab. |
 | 4 | On the demo tab: **Help me on this page** | “This is our clearly labelled practice form — not a real government site.” Point at the **Local Demo Mode** badge: “No AI keys right now, so these steps come from built-in rules — and we label that.” |
 | 5 | Answer *My name is Sita Devi* → show confirm card → **Yes, fill it** | “It shows exactly what it will type and where, and waits. Then it fills the real field and reads it back.” |

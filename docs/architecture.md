@@ -26,13 +26,20 @@ The shared files are UMD-style: the browser gets `globalThis.WebSaathi.<module>`
 
 `HIGHLIGHT_ELEMENT`, `ASK_QUESTION`, `FILL_FIELD`, `EXPLAIN_ERROR`, `HUMAN_HANDOFF`, `WAIT_FOR_USER`, `COMPLETE_GUIDANCE`. There is deliberately **no click, submit or navigate action**. Navigation happens only from the registry after the user confirms.
 
+## Launcher (`shared/intents.js`)
+
+`intents.match(text)` turns a typed or spoken request into a **task** (e.g. `book_flight`, `status_train`, `complaint_train`, `cancel_ticket`) using verb words (book / complain / status / cancel) plus noun words per task, in English, Hinglish, Hindi and Kannada. A verb without a noun, or a noun without a verb, returns *clarify* (the panel asks which kind) instead of guessing. Each task lists registry portal **ids** (official site first) and a "keep these ready" checklist; `optionsFor(task, preferred)` is what the panel shows as *"I can guide you on these verified websites"*. A brand the user names (“on ixigo”) moves to the front. Banking and other uncovered topics return *unsupported* and are declined with an honest message. The matcher never returns a URL. Opening a new tab or leaving a verified site sends the panel back to this screen.
+
+## Content-script injection
+
+Original portals and the demo have an always-on content script. The newer sites (AirSewa, NTES and the private travel sites) have **host permission only**: the side panel injects the content script on demand (`chrome.scripting.executeScript`) when the user chooses to be guided, so WebSaathi is not running on those sites otherwise. `tests/browser/launcher-tabs.test.js` exercises this path with a manifest that has no `content_scripts`.
+
 ## Site policies
 
 | Origin | Policy |
 |---|---|
-| `https://www.irctc.co.in` | guide-only |
-| `https://railmadad.indianrailways.gov.in` | guide-only |
-| `https://consumerhelpline.gov.in`, `https://www.consumerhelpline.gov.in` | guide-only |
-| `https://pgportal.gov.in`, `https://www.pgportal.gov.in` | guide-only |
+| `https://www.irctc.co.in`, `https://enquiry.indianrail.gov.in` (NTES), `https://railmadad.indianrailways.gov.in` | guide-only |
+| `https://consumerhelpline.gov.in`, `https://pgportal.gov.in`, `https://airsewa.gov.in` (+ `www.` variants where listed in the registry) | guide-only |
+| `https://www.makemytrip.com`, `https://www.goibibo.com`, `https://www.yatra.com`, `https://www.ixigo.com`, `https://www.redbus.in` (private companies) | guide-only |
 | `http://localhost:5500`, `http://127.0.0.1:5500` (demo) | assist |
-| anything else | unsupported — content script stays inactive |
+| anything else (including payment sub-domains of the travel sites) | unsupported — content script stays inactive |

@@ -8,6 +8,9 @@
 - Record the video pitch from the demo guide.
 
 **Next**
+- Travel: safe *search-form assist* (from / to / date / travellers) on travel sites behind the existing confirm step, with adapters for their autocomplete and date-picker widgets; plain-language explanations of fare types, baggage, cancellation rules and pre-ticked add-ons; payment always handed to the user. Needs hands-on testing on the live sites and a check of each site's terms before any automation.
+- Banking: **not started on purpose.** Guide-only explanations and look-alike-site / scam warnings first, activated only on the user's click, after a dedicated security and privacy review.
+- Manual check of the Goibibo, Yatra and redBus origins; add more airlines and state bus corporations.
 - Kannada voice (input/output) once verified.
 - Portal adapters for custom widgets (IRCTC date picker and station autocomplete — guide only).
 - More verified portals: National Scholarship Portal, DigiLocker, bank grievance portals, state e-governance services.

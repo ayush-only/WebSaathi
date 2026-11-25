@@ -16,6 +16,8 @@
     portal: null,
     pendingPortal: null,
     task: '',
+    taskCtx: null,   // { task, preferred, heard } while the user is choosing a website
+    view: null,      // what the launcher is showing, so a language change can redraw it
     session: null
   };
   const t = (key, vars) => WS.i18n.t(st.lang, key, vars);
@@ -34,7 +36,7 @@
   }
 
   function show(screen) {
-    for (const s of ['home', 'route', 'session', 'unsupported']) $('#screen-' + s).hidden = s !== screen;
+    for (const s of ['home', 'kinds', 'options', 'route', 'session', 'unsupported']) $('#screen-' + s).hidden = s !== screen;
     $('#main').focus({ preventScroll: true });
   }
 
@@ -52,8 +54,12 @@
     document.querySelectorAll('[data-i18n-placeholder]').forEach((n) => { n.placeholder = t(n.dataset.i18nPlaceholder); });
     updateVoiceButton();
     updateBadge();
+    renderTiles();
+    const v = st.view;
+    if (v && v.screen === 'kinds' && !$('#screen-kinds').hidden) showKinds(v.title, v.tasks, v.heard, true);
+    if (v && v.screen === 'options' && !$('#screen-options').hidden) showOptions(v.task, v.preferred, v.heard, true);
     if (st.session) { renderSiteHeader(); st.session.lastKey = ''; step(true); }
-    if (!$('#screen-route').hidden && st.routePortal) showRoute(st.routePortal);
+    if (!$('#screen-route').hidden && st.routePortal) showRoute(st.routePortal, true);
   }
 
   function updateBadge() {
@@ -108,12 +114,14 @@
     const portal = tab.url ? WS.registry.portalForUrl(tab.url) : null;
     const s = st.session;
 
-    if (s && !portal) {
-      // Same tab navigated away from a verified origin → warn. Different tab → just pause.
-      if (!switchedTab && event === 'updated') setBanner(t('leftOfficial'));
-      endSession();
+    if (!portal) {
+      // Left a verified website, or opened a new tab / any other page: ask what the user wants to do.
+      if (s) {
+        if (!switchedTab && event === 'updated') setBanner(t('leftOfficial'));
+        endSession();
+      }
       st.portal = null;
-      show('unsupported');
+      if (!st.pendingPortal && (s || event === 'activated' || event === 'created')) goLauncher();
       return;
     }
     st.portal = portal;
@@ -130,14 +138,83 @@
     }
   }
 
-  // ------------------------------------------------------------------ home + routing
-  function showRoute(portal) {
+  // ------------------------------------------------------------------ launcher: what do you want to do?
+  const label = (obj) => obj[st.lang] || obj.en;
+
+  function goLauncher() {
+    st.taskCtx = null;
+    st.view = null;
+    $('#intent-msg').textContent = '';
+    show('home');
+  }
+
+  function renderTiles() {
+    const box = $('#category-tiles');
+    box.replaceChildren(...WS.intents.CATEGORIES.map((c) =>
+      el('button', { type: 'button', class: 'task', 'data-category': c.id, onclick: () => onCategory(c) },
+        el('span', { 'aria-hidden': 'true' }, c.icon), el('span', {}, label(c.label)))));
+  }
+
+  function onCategory(cat) {
+    const tasks = WS.intents.tasksIn(cat.id);
+    st.task = label(cat.label);
+    if (tasks.length === 1) showOptions(tasks[0], null, '');
+    else showKinds(cat.label, tasks, '');
+  }
+
+  /** One more choice is needed ("which kind of ticket?"). */
+  function showKinds(title, tasks, heard, redraw) {
+    st.view = { screen: 'kinds', title, tasks, heard };
+    $('#kinds-title').textContent = title ? label(title) : t('chooseKind');
+    $('#kinds-heard').textContent = heard ? t('heard', { text: heard }) : '';
+    $('#kinds-list').replaceChildren(...tasks.map((task) =>
+      el('button', { type: 'button', class: 'pick', 'data-task': task.id, onclick: () => showOptions(task, null, heard) },
+        el('span', { class: 'ico', 'aria-hidden': 'true' }, task.icon), el('span', {}, label(task.label)))));
+    if (redraw) return;
+    show('kinds');
+    say(t('chooseKind'));
+  }
+
+  /** The "can WebSaathi help?" answer: the verified websites it can guide on for this task. */
+  function showOptions(task, preferred, heard, redraw) {
+    st.view = { screen: 'options', task, preferred, heard };
+    st.taskCtx = { task, preferred, heard };
+    st.task = [task.label.en, heard].filter(Boolean).join(' — ');
+    $('#options-title').textContent = task.icon + ' ' + label(task.label);
+    $('#options-heard').textContent = heard ? t('heard', { text: heard }) : '';
+    const opts = WS.intents.optionsFor(task, preferred);
+    $('#options-list').replaceChildren(...opts.map((o, i) => {
+      const p = o.portal;
+      const kindKey = { gov: 'kindGov', railway: 'kindRailway', travel: 'kindTravel', demo: 'kindDemo' }[p.kind] || 'kindGov';
+      // Only an official (government / Railways) site is ever marked 'Suggested'; private travel sites are listed neutrally.
+      const suggested = i === 0 && opts.length > 1 && (p.kind === 'gov' || p.kind === 'railway');
+      return el('li', {},
+        el('button', { type: 'button', class: 'opt' + (suggested ? ' opt-top' : ''), 'data-portal': p.id, onclick: () => showRoute(p) },
+          el('span', { class: 'opt-name' }, label(p.name)),
+          el('span', { class: 'opt-domain' }, WS.registry.displayDomain(p)),
+          el('span', { class: 'tags' },
+            suggested ? el('span', { class: 'tag tag-suggested' }, t('recommended')) : null,
+            el('span', { class: 'tag' }, t(kindKey)),
+            el('span', { class: 'tag' }, o.level === 'assist' ? t('levelAssist') : t('levelGuide')))));
+    }));
+    const ready = WS.intents.readyList(task, st.lang);
+    $('#ready-box').hidden = !ready.length;
+    $('#ready-list').replaceChildren(...ready.map((r) => el('li', {}, r)));
+    if (redraw) return;
+    show('options');
+    say(label(task.label) + '. ' + t('optionsTitle') + ': ' + opts.map((o) => label(o.portal.name)).join(', '));
+  }
+
+  function showRoute(portal, redraw) {
     st.routePortal = portal;
-    $('#route-title').textContent = portal.name[st.lang] || portal.name.en;
+    const kindKey = { gov: 'kindGov', railway: 'kindRailway', travel: 'kindTravel', demo: 'kindDemo' }[portal.kind] || 'kindGov';
+    $('#route-kind').textContent = t(kindKey);
+    $('#route-title').textContent = label(portal.name);
     $('#route-domain').textContent = WS.registry.displayDomain(portal);
-    $('#route-purpose').textContent = portal.purpose[st.lang] || portal.purpose.en;
+    $('#route-purpose').textContent = label(portal.purpose);
+    if (redraw) return;
     show('route');
-    say((portal.name[st.lang] || portal.name.en) + '. ' + (portal.purpose[st.lang] || portal.purpose.en));
+    say(label(portal.name) + '. ' + label(portal.purpose));
   }
 
   async function openPortal() {
@@ -145,18 +222,28 @@
     const check = WS.registry.checkNavigation(portal.url);
     if (!check.ok) { $('#intent-msg').textContent = t('blocked', { code: check.reason }); show('home'); return; }
     st.pendingPortal = portal;
+    setTimeout(() => { if (st.pendingPortal === portal) st.pendingPortal = null; }, 60000); // never stay 'waiting' forever
     const tab = await chrome.tabs.create({ url: portal.url, active: true });
     st.tabId = tab.id;
     show('home');
     $('#intent-msg').textContent = '…';
   }
 
+  /** Typed or spoken request → the launcher decides what to show. */
   function routeText(text) {
-    st.task = text;
-    const match = WS.registry.routeIntent(text);
-    if (!match) { $('#intent-msg').textContent = t('noMatch'); say(t('noMatch')); return; }
-    $('#intent-msg').textContent = '';
-    showRoute(match.portal);
+    const said = String(text || '').trim();
+    if (!said) return;
+    st.task = said;
+    const r = WS.intents.match(said);
+    const msg = $('#intent-msg');
+    msg.textContent = '';
+    switch (r.kind) {
+      case 'intent': return showOptions(r.task, r.preferred, said);
+      case 'clarify': return showKinds(r.category ? r.category.label : null, r.options, said);
+      case 'portal': return showRoute(r.portal);
+      case 'unsupported': msg.textContent = t(r.topic === 'bank' ? 'unsupportedBank' : 'unsupportedOther'); return say(msg.textContent);
+      default: msg.textContent = t('noMatch'); return say(t('noMatch'));
+    }
   }
 
   // ------------------------------------------------------------------ session
@@ -498,6 +585,7 @@
       target.value = text;
       msg.textContent = '';
       target.focus();
+      if (btn.id === 'intent-mic') routeText(text); // voice-first: say it, and the launcher answers
     } catch (err) {
       const code = err.message;
       if (code === 'not-allowed' || code === 'service-not-allowed') {
@@ -529,13 +617,13 @@
     $('#engine-badge').addEventListener('click', async () => { await WS.api.checkHealth(); updateBadge(); });
     $('#intent-form').addEventListener('submit', (e) => { e.preventDefault(); routeText($('#intent').value); });
     $('#intent-mic').addEventListener('click', micHandler);
-    document.querySelectorAll('.task').forEach((b) => b.addEventListener('click', () => {
-      st.task = b.textContent.trim();
-      showRoute(WS.registry.getPortal(b.dataset.portal));
-    }));
+    $('#task-practice').addEventListener('click', () => showOptions(WS.intents.getTask('practice'), null, ''));
     $('#route-open').addEventListener('click', openPortal);
-    $('#route-cancel').addEventListener('click', () => show('home'));
-    document.querySelectorAll('[data-go-home]').forEach((b) => b.addEventListener('click', () => { setBanner(null); show('home'); }));
+    $('#route-cancel').addEventListener('click', () => {
+      if (st.taskCtx) showOptions(st.taskCtx.task, st.taskCtx.preferred, st.taskCtx.heard); else goLauncher();
+    });
+    $('#options-back').addEventListener('click', goLauncher);
+    document.querySelectorAll('[data-go-home]').forEach((b) => b.addEventListener('click', () => { setBanner(null); goLauncher(); }));
     $('#help-page').addEventListener('click', async () => {
       const tab = await activeTab();
       st.tabId = tab && tab.id;
@@ -576,13 +664,14 @@
         setTimeout(() => { s.lastKey = ''; step(true); }, 700);
       }
     });
-    $('#ctl-stop').addEventListener('click', () => { endSession(); show('home'); });
+    $('#ctl-stop').addEventListener('click', () => { endSession(); goLauncher(); });
 
     chrome.runtime.onMessage.addListener((msg, sender) => {
       if (!sender.tab || sender.tab.id !== st.tabId || !st.session) return;
       if (msg.type === 'WS_PAGE_CHANGED') scheduleStep(300);
     });
     chrome.tabs.onActivated.addListener(() => refreshTab('activated'));
+    chrome.tabs.onCreated.addListener(() => refreshTab('created'));
     chrome.tabs.onUpdated.addListener((tabId, info) => {
       if (tabId === st.tabId && (info.status === 'complete' || info.url)) refreshTab('updated');
       else if (st.pendingPortal && info.status === 'complete') refreshTab('updated');

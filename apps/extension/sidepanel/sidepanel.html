@@ -44,28 +44,45 @@
       </form>
       <p id="intent-msg" class="msg" role="status" aria-live="polite"></p>
 
-      <h2 class="small-h" data-i18n="quickTasks">Or choose a task</h2>
-      <div class="tasks">
-        <button type="button" class="task" data-portal="irctc"><span aria-hidden="true">🚆</span><span data-i18n="taskTrain"></span></button>
-        <button type="button" class="task" data-portal="railmadad"><span aria-hidden="true">🛎️</span><span data-i18n="taskRail"></span></button>
-        <button type="button" class="task" data-portal="nch"><span aria-hidden="true">🧾</span><span data-i18n="taskConsumer"></span></button>
-        <button type="button" class="task" data-portal="cpgrams"><span aria-hidden="true">🏛️</span><span data-i18n="taskGovt"></span></button>
-        <button type="button" class="task task-demo" data-portal="demo"><span aria-hidden="true">🧪</span><span data-i18n="taskDemo"></span></button>
-      </div>
+      <h2 class="small-h" data-i18n="chooseTask">Choose what you want to do</h2>
+      <div class="tasks" id="category-tiles"></div>
+      <button type="button" class="task task-demo" id="task-practice"><span aria-hidden="true">🧪</span><span data-i18n="taskDemo"></span></button>
       <button type="button" id="help-page" class="btn btn-secondary wide" data-i18n="helpThisPage">Help me on this page</button>
+    </section>
+
+    <!-- WHICH KIND (when the request needs one more choice) -->
+    <section id="screen-kinds" hidden aria-labelledby="kinds-title">
+      <h1 id="kinds-title"></h1>
+      <p id="kinds-heard" class="note"></p>
+      <div id="kinds-list" class="stack"></div>
+      <div class="row"><button type="button" class="btn btn-secondary" data-go-home data-i18n="back">Back</button></div>
+    </section>
+
+    <!-- WHERE I CAN HELP -->
+    <section id="screen-options" hidden aria-labelledby="options-title">
+      <h1 id="options-title"></h1>
+      <p id="options-heard" class="note"></p>
+      <h2 class="small-h" data-i18n="optionsTitle">I can guide you on these verified websites</h2>
+      <ul id="options-list" class="stack plain"></ul>
+      <div id="ready-box" class="card">
+        <h2 class="small-h tight" data-i18n="readyTitle">Keep these ready</h2>
+        <ul id="ready-list" class="ready"></ul>
+      </div>
+      <p class="note" data-i18n="limitsNote"></p>
+      <div class="row"><button type="button" class="btn btn-secondary" id="options-back" data-i18n="back">Back</button></div>
     </section>
 
     <!-- ROUTE CONFIRMATION -->
     <section id="screen-route" hidden aria-labelledby="route-title">
       <div class="card card-verified">
-        <p class="eyebrow"><span aria-hidden="true">✅</span> <span data-i18n="officialSite">Official website</span></p>
+        <p class="eyebrow"><span aria-hidden="true">✅</span> <span id="route-kind"></span></p>
         <h1 id="route-title"></h1>
         <p class="domain" id="route-domain"></p>
         <p id="route-purpose"></p>
         <p class="note" data-i18n="verifiedNote"></p>
         <div class="row">
           <button type="button" class="btn btn-primary" id="route-open" data-i18n="openSite">Open official site</button>
-          <button type="button" class="btn btn-secondary" id="route-cancel" data-i18n="cancel">Cancel</button>
+          <button type="button" class="btn btn-secondary" id="route-cancel" data-i18n="back">Back</button>
         </div>
       </div>
     </section>
@@ -113,6 +130,7 @@
 
   <script src="../shared/i18n.js"></script>
   <script src="../shared/registry.js"></script>
+  <script src="../shared/intents.js"></script>
   <script src="../shared/schema.js"></script>
   <script src="../shared/redact.js"></script>
   <script src="../shared/safety.js"></script>

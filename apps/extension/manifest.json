@@ -3,16 +3,33 @@
   "name": "WebSaathi — AI Web Companion",
   "short_name": "WebSaathi",
   "version": "0.1.0",
-  "description": "Guides non-technical users through official Indian portals step by step, in English, Hindi and Kannada. Stops for passwords, OTPs, CAPTCHAs and payments.",
+  "description": "Guides non-technical users through verified Indian travel, railway and government websites step by step, in English, Hindi and Kannada. Stops for passwords, OTPs, CAPTCHAs and payments.",
   "minimum_chrome_version": "116",
-  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
     "default_title": "Open WebSaathi",
-    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png" }
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
   },
-  "side_panel": { "default_path": "sidepanel/sidepanel.html" },
-  "background": { "service_worker": "background/service-worker.js" },
-  "permissions": ["sidePanel", "storage", "scripting"],
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "scripting"
+  ],
   "host_permissions": [
     "https://www.irctc.co.in/*",
     "https://railmadad.indianrailways.gov.in/*",
@@ -20,6 +37,13 @@
     "https://www.consumerhelpline.gov.in/*",
     "https://pgportal.gov.in/*",
     "https://www.pgportal.gov.in/*",
+    "https://airsewa.gov.in/*",
+    "https://enquiry.indianrail.gov.in/*",
+    "https://www.makemytrip.com/*",
+    "https://www.goibibo.com/*",
+    "https://www.yatra.com/*",
+    "https://www.ixigo.com/*",
+    "https://www.redbus.in/*",
     "http://localhost/*",
     "http://127.0.0.1/*"
   ],
@@ -35,10 +59,18 @@
         "http://localhost/*",
         "http://127.0.0.1/*"
       ],
-      "js": ["shared/registry.js", "shared/schema.js", "shared/redact.js", "shared/safety.js", "content/content.js"],
+      "js": [
+        "shared/registry.js",
+        "shared/schema.js",
+        "shared/redact.js",
+        "shared/safety.js",
+        "content/content.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     }
   ],
-  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'self'" }
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
 }
