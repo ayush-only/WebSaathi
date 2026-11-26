@@ -27,6 +27,19 @@ See `AGENTS.md` for owners, branches and safety rules.
 ## Run
 ```
 npm install
-npm run sites
+npm run sync:case      # copy case/ into the extension (after any change in case/)
+npm run sites          # practice seller http://localhost:5501, helpline http://localhost:5502
 ```
-Then load `extension/` unpacked in Chrome. Setup details will be filled in as parts land.
+Then open `chrome://extensions`, turn on Developer mode, choose **Load unpacked** and pick `extension/`.
+Open the seller's order page `http://localhost:5501/orders/MS-48213` and the WebSaathi side panel.
+The full walkthrough is in [`docs/demo.md`](docs/demo.md). Reset the practice portal at `http://localhost:5502/admin`.
+
+## Test
+```
+npm run lint
+npm test               # unit tests
+npm run test:browser   # Playwright with a real browser
+```
+Browser tests load unpacked extensions, which branded Chrome 137+ no longer allows. Use Chrome for Testing:
+`npx playwright-core install chromium`, then set `CHROME_PATH` to the "Google Chrome for Testing" binary it prints
+(on macOS under `~/Library/Caches/ms-playwright/chromium-*/`).
