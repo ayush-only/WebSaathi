@@ -86,3 +86,63 @@ test('seller evidence keeps its sources and rejects an invented excerpt', { skip
   assert.match(await panel.locator('[data-fact="promisedDate"] cite').innerText(), /Your refund of ₹2,499 will reach you by 12 Nov 2026/);
   assert.equal(await panel.locator('#facts li').count(), 3);
 });
+
+const helpline = 'http://localhost:5502';
+const hasMockSites = fs.existsSync(path.resolve(__dirname, '../../mock-sites/server.js'));
+
+async function fillComplaint(panel, site) {
+  const values = [
+    ['name', 'Ananya Rao', 'Ananya Rao'],
+    ['mobile', '9000000000', '9000000000'],
+    ['seller', 'Steelhouse', 'Steelhouse'],
+    ['orderId', null, 'MS-48213'],
+    ['amount', null, '₹2,499'],
+    ['purchaseDate', '2026-10-28', '2026-10-28'],
+    ['story', null, /₹2,499.*MS-48213.*12 Nov 2026/]
+  ];
+  for (const [field, answer, expected] of values) {
+    if (answer) {
+      if (field === 'mobile') {
+        await panel.locator('#field-answer').fill('OTP 482913');
+        await panel.getByRole('button', { name: 'Review answer' }).click();
+        await panel.getByText('Enter only the requested information.').waitFor();
+        assert.equal(await panel.locator('#field-answer').inputValue(), '');
+        assert.equal(await site.locator('#f-mobile').inputValue(), '');
+      }
+      await panel.locator('#field-answer').fill(answer);
+      await panel.getByRole('button', { name: 'Review answer' }).click();
+    }
+    await panel.locator('#proposed-value').waitFor();
+    const actual = site.locator('#f-' + field);
+    assert.equal(await actual.inputValue(), '', field + ' wrote before approval');
+    const preview = await panel.locator('#proposed-value').innerText();
+    if (typeof expected === 'string') assert.equal(preview, expected);
+    else assert.match(preview, expected);
+    await panel.locator('#confirm-fill').click();
+    await site.waitForFunction(([name, value]) => document.getElementById('f-' + name).value === value, [field, preview]);
+  }
+}
+
+test('filing confirms each value and records the docket only after the user submits',
+  { skip: !executable || !hasMockSites, timeout: 35000 }, async (t) => {
+    const { panel, site } = await openDemo(t);
+    await panel.locator('#intent').fill('my refund never came');
+    await panel.locator('#start-case').click();
+    await panel.locator('#open-filing').click();
+    await site.waitForURL(helpline + '/file');
+    await panel.locator('#lang').selectOption('hi');
+    await panel.getByRole('heading', { name: 'अभ्यास शिकायत दर्ज करें' }).waitFor();
+    await panel.locator('#lang').selectOption('kn');
+    await panel.getByRole('heading', { name: 'ಅಭ್ಯಾಸ ದೂರು ಸಲ್ಲಿಸಿ' }).waitFor();
+    await panel.locator('#lang').selectOption('en');
+    await panel.getByRole('heading', { name: 'File the practice complaint' }).waitFor();
+    await fillComplaint(panel, site);
+    await panel.getByRole('button', { name: 'Point to Submit complaint' }).waitFor();
+    assert.equal(site.url(), helpline + '/file');
+    assert.equal(await panel.locator('#docket-number').count(), 0);
+    await site.getByRole('button', { name: 'Submit complaint' }).click();
+    await site.waitForURL(/\/docket\//);
+    await panel.locator('#docket-number').waitFor();
+    assert.equal(await panel.locator('#docket-number').innerText(), 'Docket ' + new URL(site.url()).pathname.split('/').at(-1));
+    assert.equal(await panel.locator('#docket-status').innerText(), 'Under review');
+  });

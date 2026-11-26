@@ -2,7 +2,7 @@
   'use strict';
   const WS = globalThis.WebSaathi;
   const cases = globalThis.WebSaathiCase;
-  const { SELLER, ORDER, supportPath, pageKind, safeUrl, localFacts, validateFact } = WS.evidence;
+  const { SELLER, HELPLINE, ORDER, supportPath, pageKind, safeUrl, localFacts, validateFact, readDocket } = WS.evidence;
   const $ = (selector) => document.querySelector(selector);
   const store = cases.createFakeStore();
   const required = ['orderId', 'refundAmount', 'promisedDate'];
@@ -14,6 +14,9 @@
   let lang = 'en';
   let currentCase = null;
   let busy = false;
+  let filingTab = null;
+  let refreshQueued = false;
+  let refreshTimer;
   const targetTab = Number(new URLSearchParams(location.search).get('targetTab')) || null;
 
   const t = (key, vars) => WS.i18n.t(lang, key, vars);
@@ -26,6 +29,7 @@
   function renderStatus() {
     if (statusMessage) $('#status').textContent = t(statusMessage.key, statusMessage.vars);
   }
+  const filing = WS.filing.create($('#filing'), message, (page) => { filingTab = page.tabId; }, t);
 
   function applyLanguage() {
     document.documentElement.lang = lang;
@@ -46,6 +50,14 @@
     $('#case').hidden = !currentCase;
     if (!currentCase) return;
     $('#case-title').textContent = currentCase.title;
+    $('#open-filing').hidden = !!currentCase.docket || cases.missingFacts(currentCase).length > 0;
+    if (currentCase.docket) {
+      $('#timeline').hidden = false;
+      $('#timeline').replaceChildren(
+        WS.filing.element('h3', t('docketTitle', { number: currentCase.docket.number }), { id: 'docket-number' }),
+        WS.filing.element('p', t(currentCase.docket.status), { id: 'docket-status' })
+      );
+    }
     const facts = [...currentCase.facts].sort((a, b) => required.indexOf(a.key) - required.indexOf(b.key));
     $('#facts').replaceChildren(...facts.map((fact) => {
       const li = document.createElement('li');
@@ -102,10 +114,42 @@
     message(missing.length ? 'needFacts' : 'factsReady', { fields: missing.map((key) => t(key)).join(', ') });
   }
 
+  async function refresh() {
+    const page = await scan();
+    if (!currentCase) return;
+    if (page?.kind === 'file' && !currentCase.docket) {
+      if (!cases.missingFacts(currentCase).length) filing.show(page, currentCase, true);
+      return;
+    }
+    filing.hide();
+    if (page?.kind !== 'docket') return;
+    const docket = readDocket(page);
+    if (!docket || (currentCase.docket ? currentCase.docket.number !== docket.number : filingTab !== page.tabId)) return;
+    if (docket.status !== currentCase.docket?.status) {
+      currentCase = await store.setDocket(currentCase.id, docket);
+    }
+    render();
+    message('docketSaved');
+  }
+
+  function scheduleRefresh() {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+      if (busy) refreshQueued = true;
+      else run(refresh);
+    }, 120);
+  }
+
   function run(task) {
     if (busy) return;
     busy = true;
-    task().catch(() => message('stepFailed')).finally(() => { busy = false; });
+    const controls = document.querySelectorAll('#start-case, #capture, #support, #open-filing');
+    controls.forEach((button) => { button.disabled = true; });
+    task().catch(() => message('stepFailed')).finally(() => {
+      busy = false;
+      controls.forEach((button) => { button.disabled = false; });
+      if (refreshQueued) { refreshQueued = false; scheduleRefresh(); }
+    });
   }
 
   $('#start').addEventListener('submit', (ev) => {
@@ -131,10 +175,19 @@
     const tab = await activeTab();
     await chrome.tabs.update(tab.id, { url: SELLER + supportPath });
   }));
+  $('#open-filing').addEventListener('click', () => run(async () => {
+    const tab = await activeTab();
+    await chrome.tabs.update(tab.id, { url: HELPLINE + '/file' });
+  }));
+  chrome.tabs.onActivated.addListener(scheduleRefresh);
+  chrome.tabs.onUpdated.addListener((_id, change) => {
+    if (change.status === 'complete') scheduleRefresh();
+  });
   $('#lang').addEventListener('change', () => {
     lang = $('#lang').value;
     applyLanguage();
     render();
+    scheduleRefresh();
     chrome.storage.local.set({ lang }).catch(() => {});
   });
   $('#mic').addEventListener('click', async () => {
