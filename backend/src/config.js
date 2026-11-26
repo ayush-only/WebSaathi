@@ -29,6 +29,12 @@ const hasAwsCredentials = !!(
 module.exports = {
   port: Number(env.PORT || 8787),
   host: env.HOST || '127.0.0.1',
+  llm: {
+    provider: env.LLM_PROVIDER || (env.BEDROCK_MODEL_ID && !env.LLM_API_KEY ? 'bedrock' : 'compatible'),
+    baseUrl: env.LLM_BASE_URL || 'https://api.groq.com/openai/v1',
+    model: env.LLM_MODEL || 'openai/gpt-oss-20b',
+    apiKey: env.LLM_API_KEY || ''
+  },
   bedrock: {
     region: env.AWS_REGION || env.AWS_DEFAULT_REGION || 'us-east-1',
     modelId: env.BEDROCK_MODEL_ID || '',

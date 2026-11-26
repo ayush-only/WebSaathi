@@ -2,10 +2,11 @@
   "name": "@websaathi/backend",
   "version": "0.1.0",
   "private": true,
-  "description": "WebSaathi backend: AWS Bedrock planning + ElevenLabs voice. Holds all cloud credentials; the extension never does.",
+  "description": "Optional language model extraction and spoken guidance for WebSaathi",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=20"
