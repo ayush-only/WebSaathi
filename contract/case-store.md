@@ -11,7 +11,7 @@ Person 2 owns the implementation (`case/case-store.js`). Person 1 only calls the
 - Without Web Locks: writes are queued **per store instance** only. Two instances writing to the same case at the same time can still lose a write.
 - Writes to different cases are not ordered with respect to each other.
 
-All functions are **async** (return Promises). Errors are thrown as `Error` with a `code` property.
+The store methods in the table below are **async** (they return Promises), except `onChange`, which returns its `unsubscribe` function synchronously. Errors are `Error`s with a `code` property; async methods reject with them. The factories (`createStore`, `createFakeStore`) and all the helpers further down are **synchronous**.
 
 | Function | Returns | Notes |
 |---|---|---|
@@ -19,16 +19,16 @@ All functions are **async** (return Promises). Errors are thrown as `Error` with
 | `getCase(id)` | `Case \| null` | |
 | `listCases()` | `Case[]` | Newest `updatedAt` first. |
 | `getActiveCase()` / `setActiveCase(id)` | `Case \| null` / `void` | The case the side panel is working on; survives restart. |
-| `addFact(id, fact)` | `Case` | Throws `BAD_FACT` if a field is missing, `sourceUrl` is not http(s), or `excerpt` does not contain `value`; `SENSITIVE` if the value, the excerpt **or the full `sourceUrl` (query string included, also percent-decoded)** looks like a card number, Aadhaar, UPI ID or OTP. Adds a `fact` event. Same value from a different page: the new source replaces the old one, and the earlier source and excerpt stay in the timeline as a `note` ("Also on …"). |
+| `addFact(id, fact)` | `Case` | Throws `BAD_FACT` if a field is missing, `sourceUrl` is not http(s), or `excerpt` does not contain `value`; `SENSITIVE` if the value, the excerpt **or the full `sourceUrl` (query string included, also percent-decoded)** looks like a card number, Aadhaar, UPI ID, OTP, PIN or password, with markers in English, Hindi or Kannada (e.g. `OTP`, `ओटीपी`, `ಒಟಿಪಿ`) and ASCII, Devanagari or Kannada digits; a postal PIN code is allowed. Adds a `fact` event. Same value from a different page: the new source replaces the old one, and the earlier source and excerpt stay in the timeline as a `note` ("Also on …"). |
 | `addAttachment(id, {name, type, mime, dataUrl})` | `Attachment` | Throws `TOO_LARGE` over 2 MB. `mime` is optional (read from the data URL). |
 | `removeAttachment(id, attachmentId)` | `Case` | Adds a `note` event. |
 | `setDocket(id, docket)` | `Case` | Adds a `filed` event the first time, `status` events after. |
-
-Every URL the store saves (`sourceUrl`, `portalUrl`, event `sourceUrl`) is stored without its query string or hash.
 | `addEvent(id, {kind, text, sourceUrl})` | `Case` | For `request`, `reply`, `note`. The same event twice in a row (e.g. page reload) is ignored. |
 | `setNextAction(id, next)` | `Case` | Overrides the computed next step until the next change. |
 | `deleteCase(id)` | `void` | Clears the active case if it was this one. |
 | `onChange(callback)` | `unsubscribe` function | Returns `unsubscribe` **synchronously** (not a Promise). `callback(case)` runs after any change, in this page or another extension page. |
+
+Every URL the store saves (`sourceUrl`, `portalUrl`, event `sourceUrl`) is stored without its query string or hash.
 
 `nextAction` is recomputed after every change with `nextActionFor(case)`: `collect` until all three facts are saved, then `file`, then `wait`; `respond` when the last `request` event has no `reply` after it (it names the `paymentProof` attachment, or a `receipt` if there is none, the same file `draftProofReply` picks); `done` when the docket status says resolved or closed.
 
