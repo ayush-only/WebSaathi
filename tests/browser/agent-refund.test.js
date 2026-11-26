@@ -77,7 +77,7 @@ async function openDemo(t) {
   };
 }
 
-test('seller evidence keeps its sources and rejects an invented excerpt', { skip: !executable, timeout: 35000 }, async (t) => {
+if (require.main === module) test('seller evidence keeps its sources and rejects an invented excerpt', { skip: !executable, timeout: 35000 }, async (t) => {
   const { panel, site } = await openDemo(t);
   await panel.evaluate(() => {
     globalThis.WebSaathi.api.extract = async () => [{
@@ -149,7 +149,7 @@ async function fillComplaint(panel, site) {
   }
 }
 
-test('filing confirms each value and records the docket only after the user submits',
+if (require.main === module) test('filing confirms each value and records the docket only after the user submits',
   { skip: !executable || !hasMockSites, timeout: 35000 }, async (t) => {
     const { panel, site } = await openDemo(t);
     await panel.locator('#intent').fill('my refund never came');
@@ -173,49 +173,4 @@ test('filing confirms each value and records the docket only after the user subm
     assert.equal(await panel.locator('#timeline .wsc-filed').getByText('Under review', { exact: true }).innerText(), 'Under review');
   });
 
-test('proof request uses saved evidence and leaves Upload and Send to the user',
-  { skip: !executable || !hasMockSites, timeout: 35000 }, async (t) => {
-    const demo = await openDemo(t);
-    let { panel, site } = demo;
-    await panel.locator('#intent').fill('my refund never came');
-    await panel.locator('#start-case').click();
-    await panel.locator('#save-proof').click();
-    await panel.getByText('Practice proof saved to this case.').waitFor();
-    await panel.locator('#open-filing').click();
-    await site.waitForURL(helpline + '/file');
-    await fillComplaint(panel, site);
-    await panel.getByRole('button', { name: 'Point to Submit complaint' }).waitFor();
-    await site.getByRole('button', { name: 'Submit complaint' }).click();
-    await site.waitForURL(/\/docket\//);
-    await panel.locator('#timeline .wsc-stamp span').waitFor();
-    const portalUrl = site.url();
-
-    const response = await fetch(helpline + '/admin/simulate/' + portalUrl.split('/').at(-1), { method: 'POST' });
-    assert.equal(response.status, 200);
-    if (fs.existsSync(path.join(extension, 'vendor/case/case-store.js'))) {
-      ({ panel, site } = await demo.restart(portalUrl));
-    } else {
-      await site.reload();
-    }
-    await panel.locator('#proof-request-title').waitFor();
-    assert.match(await panel.locator('#proof-request').innerText(), /भुगतान का सबूत/);
-    assert.match(await panel.locator('#proof-name').innerText(), /upi-payment-ms48213\.png/);
-    assert.match(await panel.locator('#proof-draft').innerText(), /proof of payment/i);
-    await panel.getByRole('button', { name: 'Point to Upload document' }).click();
-    const question = panel.getByRole('textbox', { name: 'Ask about this reply' });
-    await question.fill('Press Send for me');
-    await question.press('Enter');
-    await panel.getByText('You need to press Send yourself after reviewing the reply.').waitFor();
-    await question.fill('OTP 482913');
-    await question.press('Enter');
-    await panel.getByText('I can’t use an OTP or other sensitive information.').waitFor();
-    assert.equal(await question.inputValue(), '');
-    assert.equal(await site.locator('#r-file').inputValue(), '');
-    assert.equal(await site.locator('#r-msg').inputValue(), '');
-    assert.equal(await site.locator('.status').innerText(), 'Information needed');
-    await site.locator('#r-file').setInputFiles(path.resolve(__dirname, '../../mock-sites/assets/upi-payment-ms48213.png'));
-    await site.locator('#r-msg').fill(await panel.locator('#proof-draft').innerText());
-    await site.getByRole('button', { name: 'Send', exact: true }).click();
-    await panel.locator('#timeline .wsc-filed').getByText('Reply received, under review', { exact: true }).waitFor();
-    assert.equal(await panel.locator('#proof-request').isVisible(), false);
-  });
+module.exports = { openDemo, fillComplaint, executable, hasMockSites, helpline };
