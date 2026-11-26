@@ -1,0 +1,25 @@
+{
+  "id": "case_demo0001",
+  "title": "Refund for order MS-48213",
+  "createdAt": 1795500000000,
+  "updatedAt": 1795503600000,
+  "facts": [
+    { "key": "orderId", "value": "MS-48213", "sourceUrl": "http://localhost:5501/orders/MS-48213", "excerpt": "Order ID MS-48213", "capturedAt": 1795500060000 },
+    { "key": "refundAmount", "value": "₹2,499", "sourceUrl": "http://localhost:5501/orders/MS-48213", "excerpt": "Amount paid ₹2,499 (UPI)", "capturedAt": 1795500070000 },
+    { "key": "promisedDate", "value": "12 Nov 2026", "sourceUrl": "http://localhost:5501/support/MS-48213", "excerpt": "Your refund of ₹2,499 will reach you by 12 Nov 2026.", "capturedAt": 1795500080000 }
+  ],
+  "attachments": [
+    { "id": "att_demo0001", "name": "upi-payment-ms48213.png", "type": "paymentProof", "mime": "image/png", "dataUrl": "data:image/png;base64,iVBORw0KGgo=", "addedAt": 1795500090000 }
+  ],
+  "docket": { "number": "NCH-2026-00417", "portalUrl": "http://localhost:5502/docket/NCH-2026-00417", "status": "Information needed" },
+  "timeline": [
+    { "at": 1795500000000, "kind": "note", "text": "Case opened", "sourceUrl": null },
+    { "at": 1795500060000, "kind": "fact", "text": "Saved orderId: MS-48213", "sourceUrl": "http://localhost:5501/orders/MS-48213" },
+    { "at": 1795500070000, "kind": "fact", "text": "Saved refundAmount: ₹2,499", "sourceUrl": "http://localhost:5501/orders/MS-48213" },
+    { "at": 1795500080000, "kind": "fact", "text": "Saved promisedDate: 12 Nov 2026", "sourceUrl": "http://localhost:5501/support/MS-48213" },
+    { "at": 1795500090000, "kind": "note", "text": "Attached upi-payment-ms48213.png", "sourceUrl": null },
+    { "at": 1795501000000, "kind": "filed", "text": "Complaint filed, docket NCH-2026-00417", "sourceUrl": "http://localhost:5502/docket/NCH-2026-00417" },
+    { "at": 1795503600000, "kind": "request", "text": "Portal asks: Please upload proof of payment", "sourceUrl": "http://localhost:5502/docket/NCH-2026-00417" }
+  ],
+  "nextAction": { "kind": "respond", "text": "Upload your proof of payment and send the drafted reply." }
+}
