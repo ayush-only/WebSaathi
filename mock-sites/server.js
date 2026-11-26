@@ -19,8 +19,20 @@ const DATA = process.env.DATA_FILE || path.join(__dirname, 'data', 'dockets.json
 const ASSETS = path.join(__dirname, 'assets');
 
 // ---------------------------------------------------------------- docket storage
-function load() { try { return JSON.parse(fs.readFileSync(DATA, 'utf8')); } catch (_) { return { next: 417, dockets: {} }; } }
-function save(db) { fs.mkdirSync(path.dirname(DATA), { recursive: true }); fs.writeFileSync(DATA, JSON.stringify(db, null, 2)); }
+// Start empty only when the file doesn't exist. A file that can't be read or parsed throws (the request gets a 500)
+// instead of being treated as empty, so older dockets are never wiped by the next save.
+function load() {
+  let raw;
+  try { raw = fs.readFileSync(DATA, 'utf8'); } catch (e) { if (e.code === 'ENOENT') return { next: 417, dockets: {} }; throw e; }
+  return JSON.parse(raw);
+}
+// Write a temporary file and rename it over the old one, so a crash mid-write never leaves a half-written file.
+function save(db) {
+  fs.mkdirSync(path.dirname(DATA), { recursive: true });
+  const tmp = `${DATA}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
+  fs.renameSync(tmp, DATA);
+}
 function tick(d) {
   if (d.status === 'under-review' && Date.now() - d.filedAt >= DELAY) askForProof(d);
   return d;

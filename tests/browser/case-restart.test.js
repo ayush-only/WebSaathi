@@ -65,6 +65,15 @@ test('case survives a browser restart', { skip: exe ? false : 'Chrome not found'
     await b.waitForFunction(() => window.seen.includes('wait'), null, { timeout: 10000 });
     const seen = await b.evaluate(() => window.seen);
     assert.ok(seen.includes('collect') && seen.includes('file') && seen.includes('wait'), seen.join(','));
+
+    // Two open panels writing at the same moment: each page has its own store, so only the shared lock keeps both writes.
+    const write = (p, from) => p.evaluate(async (who) => {
+      const c = await store.getActiveCase();
+      await Promise.all([1, 2, 3, 4, 5].map((i) => store.addEvent(c.id, { kind: 'note', text: `note ${who}${i}` })));
+    }, from);
+    await Promise.all([write(a, 'a'), write(b, 'b')]);
+    const notes = await a.evaluate(async () => (await store.getActiveCase()).timeline.filter((e) => /^note [ab]\d$/.test(e.text)).length);
+    assert.equal(notes, 10, 'no note from either page was lost');
     await ctx.close();
   });
 

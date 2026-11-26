@@ -80,3 +80,63 @@ test('proof helpers', () => {
   assert.match(P.explainRequest(sample, 'Please upload proof of payment', 'hi'), /सबूत.*upi-payment-ms48213\.png/);
   assert.match(P.explainRequest(sample, 'Please upload proof of payment', 'kn'), /ಪುರಾವೆ/);
 });
+
+test('store: sensitive excerpts are refused and URLs lose their query string (review on #6)', async () => {
+  const s = C.createFakeStore();
+  const c = await s.createCase('x');
+  const url = 'http://localhost:5501/orders/MS-48213';
+  await assert.rejects(s.addFact(c.id, fact('orderId', 'MS-48213', 'Order ID MS-48213 · your OTP is 482913')), { code: 'SENSITIVE' });
+  await assert.rejects(s.addFact(c.id, fact('orderId', 'MS-48213', 'MS-48213 482913 is your OTP')), { code: 'SENSITIVE' });
+  await assert.rejects(s.addFact(c.id, fact('refundAmount', '₹2,499', '₹2,499 paid from ravi@okhdfc')), { code: 'SENSITIVE' });
+  await assert.rejects(s.addFact(c.id, fact('refundAmount', '₹2,499', '₹2,499 on card 4111 1111 1111 1111')), { code: 'SENSITIVE' });
+  await assert.rejects(s.addFact(c.id, fact('orderId', 'MS-48213', 'Order ID MS-48213', 'javascript:alert(1)')), { code: 'BAD_FACT' });
+  const r = await s.addFact(c.id, fact('orderId', 'MS-48213', 'Order ID MS-48213', url + '?token=abc#top'));
+  assert.equal(r.facts[0].sourceUrl, url);
+  assert.ok(r.timeline.every((e) => !e.sourceUrl || !/[?#]/.test(e.sourceUrl)));
+  await s.addFact(c.id, fact('refundAmount', '₹2,499', 'Amount paid ₹2,499 (UPI)'));
+  await s.addFact(c.id, fact('promisedDate', '12 Nov 2026', 'Refund by 12 Nov 2026'));
+  const d = await s.setDocket(c.id, { number: 'CHP-2026-00417', portalUrl: 'http://localhost:5502/docket/CHP-2026-00417?session=1', status: 'Under review' });
+  assert.equal(d.docket.portalUrl, 'http://localhost:5502/docket/CHP-2026-00417');
+});
+
+test('store: two stores on one storage (two open panels) never lose each other’s writes (review on #6)', async () => {
+  const storage = C.memoryStorage();
+  const a = C.createStore({ storage });
+  const b = C.createStore({ storage });
+  const c = await a.createCase('x');
+  const notes = [];
+  for (let i = 0; i < 10; i++) notes.push((i % 2 ? a : b).addEvent(c.id, { kind: 'note', text: 'note ' + i }));
+  notes.push(a.addAttachment(c.id, { name: 'a.png', type: 'paymentProof', dataUrl: 'data:image/png;base64,iVBORw0KGgo=' }));
+  notes.push(b.addAttachment(c.id, { name: 'b.png', type: 'receipt', dataUrl: 'data:image/png;base64,iVBORw0KGgo=' }));
+  await Promise.all(notes);
+  const r = await a.getCase(c.id);
+  for (let i = 0; i < 10; i++) assert.ok(r.timeline.some((e) => e.text === 'note ' + i), 'note ' + i);
+  assert.deepEqual(r.attachments.map((x) => x.name).sort(), ['a.png', 'b.png']);
+});
+
+test('next action names a receipt when that is what the draft reply attaches (review on #6)', async () => {
+  const s = C.createFakeStore();
+  const c = await s.createCase('x');
+  for (const f of sample.facts) await s.addFact(c.id, f);
+  await s.addAttachment(c.id, { name: 'receipt-ms48213.pdf', type: 'receipt', dataUrl: 'data:application/pdf;base64,JVBERi0=' });
+  await s.setDocket(c.id, { number: 'CHP-2026-00417', portalUrl: 'http://localhost:5502/docket/CHP-2026-00417', status: 'Under review' });
+  const r = await s.addEvent(c.id, { kind: 'request', text: 'Please upload proof of payment' });
+  assert.equal(r.nextAction.kind, 'respond');
+  assert.match(r.nextAction.text, /receipt-ms48213\.pdf/);
+  assert.equal(P.draftProofReply(r, 'Please upload proof of payment').attachmentName, 'receipt-ms48213.pdf');
+});
+
+test('store: the same fact from a second page keeps the earlier source in the timeline (review on #6)', async () => {
+  const s = C.createFakeStore();
+  const c = await s.createCase('x');
+  await s.addFact(c.id, fact('promisedDate', '12 Nov 2026', 'Refund by 12 Nov 2026'));
+  const support = 'http://localhost:5501/support/MS-48213';
+  let r = await s.addFact(c.id, fact('promisedDate', '12 Nov 2026', 'Your refund of ₹2,499 will reach you by 12 Nov 2026.', support));
+  r = await s.addFact(c.id, fact('promisedDate', '12 Nov 2026', 'Your refund of ₹2,499 will reach you by 12 Nov 2026.', support));
+  assert.equal(r.facts.length, 1);
+  assert.equal(r.facts[0].sourceUrl, support, 'newest source is the fact’s');
+  const earlier = r.timeline.filter((e) => e.kind === 'note' && e.text.startsWith('Also on'));
+  assert.equal(earlier.length, 1, 'earlier source noted once');
+  assert.equal(earlier[0].sourceUrl, 'http://localhost:5501/orders/MS-48213');
+  assert.match(earlier[0].text, /“Refund by 12 Nov 2026”/);
+});

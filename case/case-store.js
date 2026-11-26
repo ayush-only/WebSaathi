@@ -4,7 +4,9 @@
  *   createStore({ storage })       → any adapter with get/set/remove/onChanged (tests)
  *   createFakeStore()              → same store on an in-memory adapter
  * Needs the "storage" and "unlimitedStorage" permissions (attachments are data URLs up to 2 MB each).
- * Writes are queued, so two quick calls never overwrite each other.
+ * Writes are serialised across every extension page and the service worker (Web Locks), so two open panels never
+ * overwrite each other. Without Web Locks (Node tests) the storage adapter's own lock, or a per-store queue, is used.
+ * Excerpts and values that look like a card number, Aadhaar, UPI ID or OTP are refused; URLs are stored without query or hash.
  * nextAction is recomputed after every change (see nextActionFor); setNextAction overrides it until the next change.
  */
 (function (root, factory) {
@@ -18,7 +20,14 @@
   const ATTACHMENT_TYPES = ['paymentProof', 'receipt', 'other'];
   const NEXT_KINDS = ['collect', 'file', 'wait', 'respond', 'done'];
   const MAX_ATTACHMENT = 2 * 1024 * 1024;
-  const SECRET_RE = /\b(\d{4}[ -]?\d{4}[ -]?\d{4}(?:[ -]?\d{4})?|\d{6}\b(?=.*\b(otp|pin)\b)|[\w.-]+@(ok\w+|ybl|ibl|axl|paytm|upi))\b/i;
+  const SECRET_RES = [
+    /\b\d{4}[ -]?\d{4}[ -]?\d{4}(?:[ -]?\d{1,7})?\b/,                                     // card or Aadhaar
+    /\b\d{4,8}\b.{0,20}\b(otp|pin|mpin|cvv|cvc|passcode|verification code)\b/i,          // "482913 is your OTP"
+    /\b(otp|pin|mpin|cvv|cvc|passcode|verification code|password)\b\D{0,20}\d{3,12}/i,   // "OTP: 482913"
+    /\bpass(word|code)\s*(is|:|=)\s*\S+/i,
+    /[\w.-]+@(ok\w+|ybl|ibl|axl|paytm|upi|apl|yapl|ikwik|fbl|pthdfc|ptsbi|ptyes|ptaxis)\b/i  // UPI IDs
+  ];
+  const looksSecret = (s) => SECRET_RES.some((re) => re.test(String(s || '')));
   const PREFIX = 'wsCase:';
   const INDEX = 'wsCase.index';
   const ACTIVE = 'wsCase.active';
@@ -27,6 +36,11 @@
   const rid = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   const clone = (x) => (x == null ? x : JSON.parse(JSON.stringify(x)));
   const normalize = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+  /** http(s) URL without query string or hash (they can carry tokens or personal data); '' if not a web URL. */
+  function cleanUrl(u) {
+    try { const x = new URL(String(u)); return /^https?:$/.test(x.protocol) ? x.origin + x.pathname : ''; } catch (_) { return ''; }
+  }
+  const shortUrl = (u) => String(u).replace(/^https?:\/\//, '');
 
   // ---------------------------------------------------------------- storage adapters
   function chromeStorage() {
@@ -48,7 +62,10 @@
     const data = new Map();
     const subs = new Set();
     const emit = (changes) => subs.forEach((f) => { try { f(changes); } catch (_) { /* listener error */ } });
+    let chain = Promise.resolve();
     return {
+      /** One lock per adapter, shared by every store on it (stands in for navigator.locks in Node). */
+      lock(fn) { const run = chain.then(fn, fn); chain = run.catch(() => {}); return run; },
       async get(keys) {
         const ks = keys == null ? [...data.keys()] : [].concat(keys);
         const out = {};
@@ -76,7 +93,8 @@
     const lastRequest = lastIndex(c.timeline, (e) => e.kind === 'request');
     const lastReply = lastIndex(c.timeline, (e) => e.kind === 'reply');
     if (lastRequest > lastReply) {
-      const proof = (c.attachments || []).find((a) => a.type === 'paymentProof');
+      // Same choice as draftProofReply in proof.js: proof of payment first, else a receipt.
+      const proof = (c.attachments || []).find((a) => a.type === 'paymentProof') || (c.attachments || []).find((a) => a.type === 'receipt');
       return { kind: 'respond', text: proof ? `The portal needs more from you. Attach ${proof.name} and send the drafted reply.` : 'The portal needs more from you. Add your proof of payment to this case first.' };
     }
     return { kind: 'wait', text: `Complaint ${c.docket.number} is with the seller. Check the status again in a few days.` };
@@ -87,8 +105,12 @@
   // ---------------------------------------------------------------- the store
   function createStore(opts) {
     const storage = (opts && opts.storage) || chromeStorage();
+    const locks = root.navigator && root.navigator.locks;
+    const lock = (opts && opts.lock) || (storage.lock && storage.lock.bind(storage))
+      || (locks ? (fn) => locks.request('wsCase.write', () => fn()) : null);
     let queue = Promise.resolve();
-    const serial = (fn) => { const run = queue.then(fn, fn); queue = run.catch(() => {}); return run; };
+    // Every read-modify-write runs under the shared lock, so stores in other pages can't interleave with it.
+    const serial = (fn) => { const task = () => (lock ? lock(fn) : fn()); const run = queue.then(task, task); queue = run.catch(() => {}); return run; };
 
     const read = async (id) => (await storage.get(PREFIX + id))[PREFIX + id] || null;
     const must = async (id) => { const c = await read(id); if (!c) throw err('NO_CASE', 'no case ' + id); return c; };
@@ -99,7 +121,7 @@
       await storage.set({ [PREFIX + c.id]: c, [INDEX]: idx.includes(c.id) ? idx : idx.concat(c.id) });
       return clone(c);
     }
-    const event = (c, kind, text, sourceUrl) => c.timeline.push({ at: Date.now(), kind, text: String(text).slice(0, 300), sourceUrl: sourceUrl || null });
+    const event = (c, kind, text, sourceUrl) => c.timeline.push({ at: Date.now(), kind, text: String(text).slice(0, 300), sourceUrl: cleanUrl(sourceUrl) || null });
     const mutate = (id, fn, o) => serial(async () => { const c = await must(id); const r = await fn(c); const saved = await write(c, o); return r === undefined ? saved : r; });
 
     return {
@@ -127,12 +149,21 @@
         for (const k of ['key', 'value', 'sourceUrl', 'excerpt']) if (!f[k] || typeof f[k] !== 'string') return Promise.reject(err('BAD_FACT', 'missing ' + k));
         const excerpt = normalize(f.excerpt).slice(0, 300);
         const value = normalize(f.value);
+        const sourceUrl = cleanUrl(f.sourceUrl);
+        if (!sourceUrl) return Promise.reject(err('BAD_FACT', 'sourceUrl must be an http(s) URL'));
         if (!excerpt.includes(value)) return Promise.reject(err('BAD_FACT', 'excerpt does not contain value'));
-        if (SECRET_RE.test(value)) return Promise.reject(err('SENSITIVE', 'looks like a card, UPI or OTP value'));
+        if (looksSecret(value) || looksSecret(excerpt)) return Promise.reject(err('SENSITIVE', 'looks like a card, Aadhaar, UPI or OTP value'));
         return mutate(id, (c) => {
           const prev = c.facts.find((x) => x.key === f.key);
-          c.facts = c.facts.filter((x) => x.key !== f.key).concat({ key: f.key, value, sourceUrl: f.sourceUrl, excerpt, capturedAt: f.capturedAt || Date.now() });
-          if (!prev || prev.value !== value) event(c, 'fact', `${prev ? 'Updated' : 'Saved'} ${labelOf(f.key).replace(/^the /, '')}: ${value}`, f.sourceUrl);
+          const name = labelOf(f.key).replace(/^the /, '');
+          c.facts = c.facts.filter((x) => x.key !== f.key).concat({ key: f.key, value, sourceUrl, excerpt, capturedAt: f.capturedAt || Date.now() });
+          if (!prev || prev.value !== value) event(c, 'fact', `${prev ? 'Updated' : 'Saved'} ${name}: ${value}`, sourceUrl);
+          else if (prev.sourceUrl !== sourceUrl) {
+            // Same value from another page: the newest source is the fact's; the earlier one stays in the timeline.
+            event(c, 'fact', `Saved ${name}: ${value}`, sourceUrl);
+            const text = `Also on ${shortUrl(prev.sourceUrl)}: “${prev.excerpt}”`;
+            if (!c.timeline.some((e) => e.kind === 'note' && e.text === text.slice(0, 300))) event(c, 'note', text, prev.sourceUrl);
+          }
         });
       },
 
@@ -154,7 +185,7 @@
           const first = !c.docket;
           const status = normalize(d.status || (c.docket && c.docket.status) || '');
           const changed = !first && status && status !== c.docket.status;
-          c.docket = { number: normalize(d.number), portalUrl: d.portalUrl || (c.docket && c.docket.portalUrl) || '', status };
+          c.docket = { number: normalize(d.number), portalUrl: cleanUrl(d.portalUrl) || (c.docket && c.docket.portalUrl) || '', status };
           if (first) event(c, 'filed', `Complaint filed. Docket ${c.docket.number}`, c.docket.portalUrl);
           else if (changed) event(c, 'status', 'Status: ' + status, c.docket.portalUrl);
         });
@@ -194,5 +225,5 @@
 
   const createFakeStore = () => createStore({ storage: memoryStorage() });
 
-  return { createStore, createFakeStore, memoryStorage, missingFacts, nextActionFor, normalize, FACT_KEYS };
+  return { createStore, createFakeStore, memoryStorage, missingFacts, nextActionFor, normalize, cleanUrl, FACT_KEYS };
 });
