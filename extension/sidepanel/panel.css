@@ -23,8 +23,7 @@ button[type="submit"], #confirm-fill { background: var(--accent); color: white; 
 :focus-visible { outline: 2px solid #bd4923; outline-offset: 3px; }
 a { color: var(--accent); }
 #status { min-height: 1.5em; }
-#facts { list-style: none; margin: .6rem 0; padding: 0; display: grid; gap: .45rem; }
-#facts li, #filing, #timeline { border: 1px solid #d5ded8; border-radius: 8px; background: white; padding: .6rem; margin-top: .6rem; }
-#facts li p { margin: .2rem 0; }
-#facts cite { display: block; font-size: .9rem; color: #50645a; }
+#filing, #proof-request, #timeline { border: 1px solid #d5ded8; border-radius: 8px; background: white; padding: .6rem; margin-top: .6rem; }
 #proposed-value { white-space: pre-wrap; overflow-wrap: anywhere; }
+#proof-request { border-color: #c34e20; background: #fff5eb; }
+#proof-request a { display: block; margin: .45rem 0; }
