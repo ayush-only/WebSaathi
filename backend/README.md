@@ -1,5 +1,9 @@
 # Optional backend
 
-Install its dependencies with `npm install --prefix backend`. Configure providers in a git-ignored `.env` at the repo root or in `backend/`, then run `npm --prefix backend start`.
+The refund demo reads facts locally and uses the browser voice. You can run it without this server or an API key.
 
-The extension works with local extraction and browser voices by default. With Bedrock configured, `POST /api/extract` can return additional facts whose excerpts and values appear on the practice seller page. ElevenLabs is optional for read-aloud. The server listens on loopback.
+For optional AI extraction, copy `backend/.env.example` to `backend/.env` and set `LLM_API_KEY`. The default endpoint is Groq. For another OpenAI-compatible chat provider, set its `LLM_BASE_URL` and `LLM_MODEL`. Keep credentials in the ignored .env file.
+
+Run `npm install --prefix backend` and `npm --prefix backend start`. The server listens on loopback. It redacts the practice page before sending it and checks each proposed fact against the page. Missing credentials, rate limits, and failed responses use local extraction.
+
+For AWS, set `LLM_PROVIDER=bedrock`, `BEDROCK_MODEL_ID`, and AWS credentials. Existing Bedrock-only configurations continue to work. ElevenLabs remains optional for read-aloud.
