@@ -26,7 +26,9 @@ function makeExtension() {
   for (const f of ['case-store.js', 'proof.js', 'timeline.js']) fs.copyFileSync(path.join(ROOT, 'case', f), path.join(dir, f));
   fs.writeFileSync(path.join(dir, 'page.html'), `<!doctype html><meta charset="utf-8"><body style="margin:0;padding:16px;width:360px;background:#fff">
 <div id="view"></div><script src="case-store.js"></script><script src="proof.js"></script><script src="timeline.js"></script>
-<script>window.store = WebSaathiCase.createStore(); window.ready = true;</script></body>`);
+<script src="init.js"></script></body>`);
+  // MV3 extension pages block inline <script>, so the setup must be its own file.
+  fs.writeFileSync(path.join(dir, 'init.js'), 'window.store = WebSaathiCase.createStore(); window.ready = true;');
   return dir;
 }
 
@@ -36,12 +38,11 @@ async function launch(userDir, ext) {
   let [w] = ctx.serviceWorkers();
   if (!w) w = await ctx.waitForEvent('serviceworker', { timeout: 15000 });
   const url = `chrome-extension://${new URL(w.url()).host}/page.html`;
-  const open = async () => { const p = await ctx.newPage(); await p.goto(url); await p.waitForFunction(() => window.ready); return p; };
+  const open = async () => { const p = await ctx.newPage(); await p.goto(url); await p.waitForFunction(() => window.ready, null, { timeout: 10000 }); return p; };
   return { ctx, open };
 }
 
-// WIP: session 1's second page does not yet see onChange events within the wait; finish in the next session.
-test('case survives a browser restart', { skip: process.env.WIP ? (exe ? false : 'Chrome not found') : 'WIP: run with WIP=1', timeout: 120000 }, async (t) => {
+test('case survives a browser restart', { skip: exe ? false : 'Chrome not found', timeout: 120000 }, async (t) => {
   const ext = makeExtension();
   const userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ws-case-profile-'));
   t.after(() => { fs.rmSync(userDir, { recursive: true, force: true }); fs.rmSync(ext, { recursive: true, force: true }); });
