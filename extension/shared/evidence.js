@@ -8,6 +8,7 @@
   const SELLER = 'http://localhost:5501';
   const HELPLINE = 'http://localhost:5502';
   const MAX_TEXT = 12000;
+  // Demo scope: evidence is collected only for practice order MS-48213.
   const ORDER = 'MS-48213';
   const orderPath = '/orders/' + ORDER;
   const supportPath = '/support/' + ORDER;

@@ -6,7 +6,6 @@
   const $ = (selector) => document.querySelector(selector);
   const store = cases.createFakeStore();
   const required = ['orderId', 'refundAmount', 'promisedDate'];
-  const labels = { orderId: 'Order ID', refundAmount: 'Refund amount', promisedDate: 'Promised refund date' };
   const ui = {
     en: ['What happened with your refund?', 'My refund never came', 'Start refund case', 'Read this page', 'Open seller support'],
     hi: ['आपके रिफंड का क्या हुआ?', 'मेरा रिफंड नहीं आया', 'रिफंड का मामला शुरू करें', 'इस पेज से सबूत पढ़ें', 'विक्रेता की चैट खोलें'],
@@ -17,7 +16,16 @@
   let busy = false;
   const targetTab = Number(new URLSearchParams(location.search).get('targetTab')) || null;
 
-  function message(text) { $('#status').textContent = text; }
+  const t = (key, vars) => WS.i18n.t(lang, key, vars);
+  let statusMessage;
+  function message(key, vars) {
+    statusMessage = { key, vars };
+    renderStatus();
+  }
+
+  function renderStatus() {
+    if (statusMessage) $('#status').textContent = t(statusMessage.key, statusMessage.vars);
+  }
 
   function applyLanguage() {
     document.documentElement.lang = lang;
@@ -27,7 +35,10 @@
     $('#start-case').textContent = start;
     $('#capture').textContent = capture;
     $('#support').textContent = support;
-    $('#mic').textContent = WS.i18n.t(lang, 'speak');
+    $('#mic').textContent = t('speak');
+    if ($('#open-filing')) $('#open-filing').textContent = t('openFiling');
+    if ($('#save-proof')) $('#save-proof').textContent = t('saveProof');
+    renderStatus();
   }
 
   function render() {
@@ -40,7 +51,7 @@
       const li = document.createElement('li');
       li.dataset.fact = fact.key;
       const title = document.createElement('strong');
-      title.textContent = labels[fact.key] + ': ' + fact.value;
+      title.textContent = t(fact.key) + ': ' + fact.value;
       const quote = document.createElement('cite');
       quote.textContent = fact.excerpt;
       const url = safeUrl(fact.sourceUrl);
@@ -87,18 +98,14 @@
       currentCase = await store.addFact(currentCase.id, fact);
     }
     const missing = cases.missingFacts(currentCase);
-    const next = missing.length
-      ? { kind: 'collect', text: 'Read the seller’s order or support page.' }
-      : { kind: 'file', text: 'Review and file your refund complaint.' };
-    currentCase = await store.setNextAction(currentCase.id, next);
     render();
-    message(missing.length ? 'Still needed: ' + missing.map((key) => labels[key]).join(', ') : 'Evidence is ready to review.');
+    message(missing.length ? 'needFacts' : 'factsReady', { fields: missing.map((key) => t(key)).join(', ') });
   }
 
   function run(task) {
     if (busy) return;
     busy = true;
-    task().catch(() => message('Could not complete this step. Try again.')).finally(() => { busy = false; });
+    task().catch(() => message('stepFailed')).finally(() => { busy = false; });
   }
 
   $('#start').addEventListener('submit', (ev) => {
@@ -106,7 +113,7 @@
     run(async () => {
       const page = await scan();
       if (!['order', 'support'].includes(page?.kind)) {
-        message('Open the WebSaathi practice seller order or support page first.');
+        message('sellerFirst');
         return;
       }
       currentCase = await store.createCase('Refund for order ' + ORDER);
@@ -117,7 +124,7 @@
   });
   $('#capture').addEventListener('click', () => run(async () => {
     const page = await scan();
-    if (!['order', 'support'].includes(page?.kind)) { message('Open the practice seller order or support page.'); return; }
+    if (!['order', 'support'].includes(page?.kind)) { message('sellerPage'); return; }
     await capture(page);
   }));
   $('#support').addEventListener('click', () => run(async () => {
@@ -127,6 +134,7 @@
   $('#lang').addEventListener('change', () => {
     lang = $('#lang').value;
     applyLanguage();
+    render();
     chrome.storage.local.set({ lang }).catch(() => {});
   });
   $('#mic').addEventListener('click', async () => {
@@ -137,7 +145,7 @@
       if (['not-allowed', 'service-not-allowed'].includes(err.message)) {
         await chrome.tabs.create({ url: chrome.runtime.getURL('pages/mic.html') });
       }
-      message(WS.i18n.t(lang, 'noSpeech'));
+      message('noSpeech');
     }
   });
 

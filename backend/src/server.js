@@ -35,7 +35,7 @@ function createApp(deps = {}) {
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
   });
-  app.use(express.json({ limit: '20kb' }));
+  app.use(express.json({ limit: '64kb' }));
   let requests = 0;
   let windowStart = 0;
   app.use('/api', (_req, res, next) => {
