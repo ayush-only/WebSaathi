@@ -19,10 +19,21 @@ const seller = 'http://localhost:5501';
 async function openDemo(t) {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'websaathi-agent-'));
   let browser;
+  let servers;
+  const mock = path.resolve(__dirname, '../../mock-sites/server.js');
   t.after(async () => {
     await browser?.close();
+    servers?.close();
     fs.rmSync(profile, { recursive: true, force: true });
   });
+  if (fs.existsSync(mock)) {
+    process.env.DATA_FILE = path.join(profile, 'dockets.json');
+    servers = require(mock).start();
+    await Promise.all([servers.seller, servers.helpline].map((server) => new Promise((resolve, reject) => {
+      server.once('listening', resolve);
+      server.once('error', reject);
+    })));
+  }
   browser = await chromium.launchPersistentContext(profile, {
     executablePath: executable,
     headless: false,
@@ -30,8 +41,7 @@ async function openDemo(t) {
   });
   const worker = browser.serviceWorkers()[0] || await browser.waitForEvent('serviceworker', { timeout: 10000 });
   const ext = 'chrome-extension://' + new URL(worker.url()).host;
-  const sellerServer = await fetch(seller + '/orders/MS-48213', { signal: AbortSignal.timeout(600) }).catch(() => null);
-  if (!sellerServer?.ok) {
+  if (!servers) {
     // Contract fixtures let Person 1 test before Person 2's mock server lands.
     await browser.route(seller + '/orders/MS-48213', (route) => route.fulfill({ contentType: 'text/html; charset=utf-8', body:
       '<h1>Practice order</h1><dl><dt>Order ID</dt><dd>MS-48213</dd><dt>Amount paid</dt><dd>₹2,499</dd></dl><p hidden>Refund by 99 Nothing 2050</p>'
