@@ -53,5 +53,5 @@ NextAction = {
 
 ## Rules
 - A fact is saved only if `excerpt` really appears in the page's visible text and contains `value` (Person 1 checks before calling `addFact`; the store re-checks that `excerpt` includes `value`).
-- Same `key` added again replaces the old fact and adds a timeline event.
+- Same `key` added again replaces the old fact and adds a timeline event. If only the source changed (same value), the earlier source and excerpt are kept in the timeline as a `note`, so no provenance is lost. One fact per key is kept on purpose: the panel shows one value per key.
 - Never store passwords, OTPs, card numbers, Aadhaar or UPI PINs in a case.
