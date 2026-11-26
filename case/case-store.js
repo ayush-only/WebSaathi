@@ -22,14 +22,25 @@
   const ATTACHMENT_TYPES = ['paymentProof', 'receipt', 'other'];
   const NEXT_KINDS = ['collect', 'file', 'wait', 'respond', 'done'];
   const MAX_ATTACHMENT = 2 * 1024 * 1024;
+  const HI_KN_MARKERS = [
+    'ओटीपी', 'ओ\\.टी\\.पी', 'एमपिन', 'पिन(?![\\s\u200c]*कोड)', 'सत्यापन\\s*कोड', 'पासवर्ड', 'पासकोड', 'सीवीवी',          // Hindi
+    'ಒಟಿಪಿ', 'ಓಟಿಪಿ', 'ಎಂಪಿನ್', 'ಪಿನ್(?![\\s\u200c]*ಕೋಡ್)', 'ಪರಿಶೀಲನಾ\\s*ಕೋಡ್', 'ಪಾಸ್\u200c?ವರ್ಡ್', 'ಸಿವಿವಿ'     // Kannada
+  ].join('|');
   const SECRET_RES = [
     /\b\d{4}[ -]?\d{4}[ -]?\d{4}(?:[ -]?\d{1,7})?\b/,                                     // card or Aadhaar
-    /\b\d{4,8}\b.{0,20}\b(otp|pin|mpin|cvv|cvc|passcode|verification code)\b/i,          // "482913 is your OTP"
-    /\b(otp|pin|mpin|cvv|cvc|passcode|verification code|password)\b\D{0,20}\d{3,12}/i,   // "OTP: 482913"
+    /\b\d{4,8}\b.{0,20}\b(otp|pin(?![ -]?code)|mpin|cvv|cvc|passcode|verification code)\b/i,          // "482913 is your OTP"
+    /\b(otp|pin(?![ -]?code)|mpin|cvv|cvc|passcode|verification code|password)\b\D{0,20}\d{3,12}/i,   // "OTP: 482913"
     /\bpass(word|code)\s*(is|:|=)\s*\S+/i,
-    /[\w.-]+@(ok\w+|ybl|ibl|axl|paytm|upi|apl|yapl|ikwik|fbl|pthdfc|ptsbi|ptyes|ptaxis)\b/i  // UPI IDs
+    /[\w.-]+@(ok\w+|ybl|ibl|axl|paytm|upi|apl|yapl|ikwik|fbl|pthdfc|ptsbi|ptyes|ptaxis)\b/i, // UPI IDs
+    // Hindi and Kannada markers (same rule as English, all three supported languages). \b doesn't work on these
+    // scripts, so the markers are matched as plain text. "पिन कोड" / "ಪಿನ್ ಕೋಡ್" (postal PIN code) is not a secret.
+    new RegExp(`(${HI_KN_MARKERS})\\D{0,20}\\d{3,12}`),                                    // "ओटीपी 482913"
+    new RegExp(`\\d{4,8}.{0,20}(${HI_KN_MARKERS})`)                                        // "482913 आपका ओटीपी है"
   ];
-  const looksSecret = (s) => SECRET_RES.some((re) => re.test(String(s || '')));
+  // Devanagari and Kannada digits count as digits: "ओटीपी ४८२९१३" is the same secret as "ओटीपी 482913".
+  const asciiDigits = (s) => String(s || '').replace(/[\u0966-\u096F]/g, (d) => String(d.charCodeAt(0) - 0x0966))
+    .replace(/[\u0CE6-\u0CEF]/g, (d) => String(d.charCodeAt(0) - 0x0CE6));
+  const looksSecret = (s) => { const t = asciiDigits(s); return SECRET_RES.some((re) => re.test(t)); };
   /** URLs are checked raw and percent-decoded (query string included), e.g. ?otp=482913 or ?otp%3D482913. */
   const urlLooksSecret = (u) => { let d = String(u || ''); try { d = decodeURIComponent(d.replace(/\+/g, ' ')); } catch (_) { /* bad escape */ } return looksSecret(u) || looksSecret(d); };
   const PREFIX = 'wsCase:';

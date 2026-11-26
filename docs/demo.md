@@ -47,11 +47,12 @@ from the practice data. Keep it on a slide in case the live demo fails.
 - On `http://localhost:5502/admin` press **Simulate reply** (off camera, or say "the practice portal replies").
 - Open the docket page. It now says **"Please upload proof of payment"**.
 - WebSaathi explains it in Hindi, out loud, points at the saved `upi-payment-ms48213.png` and shows the drafted reply.
+- **Safety moment, now, while the proof request is still open:** ask WebSaathi to press **Send** for you. It refuses
+  and highlights the button instead. (Do this before sending: the practice portal removes Send once a reply is in.)
 - The presenter attaches the file under **Upload document** and presses **Send**. Status: "Reply received, under review".
 
 ## Scene 4: what it won't do (≈30 s, still on the practice sites)
-- **Say:** "The safety rules are in code, not in a prompt."
-- On the practice docket page, ask WebSaathi to press **Send** for you: it refuses and highlights the button instead.
+- **Say:** "The safety rules are in code, not in a prompt. You just saw it refuse to press Send."
 - File a second practice complaint on `http://localhost:5502/file`. When it asks for the mobile number, type a
   fictional code such as "OTP 482913" into the panel: it refuses to take it ("Enter only the requested information").
 - Point out that the name and mobile you typed were never read back from the page: WebSaathi only fills what you

@@ -201,3 +201,24 @@ test('fake-store.js is the store, regenerated from case-store.js (npm run sync:c
   const fake = fs.readFileSync(path.join(dir, 'fake-store.js'), 'utf8');
   assert.ok(fake.endsWith(fs.readFileSync(path.join(dir, 'case-store.js'), 'utf8')), 'run npm run sync:case after changing case-store.js');
 });
+
+test('store: Hindi and Kannada OTP / PIN markers get the same rule as English (Codex, #6 re-review)', async () => {
+  const s = C.createFakeStore();
+  const c = await s.createCase('x');
+  const refused = [
+    'Order MS-48213 ओटीपी 482913', 'Order MS-48213 ಒಟಿಪಿ 482913',          // the two from the review
+    'Order MS-48213 पिन 4821', 'Order MS-48213 ಪಿನ್ 4821',
+    'Order MS-48213 सत्यापन कोड 482913', 'Order MS-48213 ಪರಿಶೀಲನಾ ಕೋಡ್ 482913',
+    'Order MS-48213: 482913 आपका ओटीपी है', 'Order MS-48213: 482913 ನಿಮ್ಮ ಒಟಿಪಿ',  // number first
+    'Order MS-48213 ओटीपी ४८२९१३', 'Order MS-48213 ಒಟಿಪಿ ೪೮೨೯೧೩',            // Devanagari / Kannada digits
+    'Order MS-48213 एमपिन 482913', 'Order MS-48213 पासवर्ड: 482913', 'Order MS-48213 PIN 4821'
+  ];
+  for (const excerpt of refused) await assert.rejects(s.addFact(c.id, fact('orderId', 'MS-48213', excerpt)), { code: 'SENSITIVE' }, excerpt);
+  await assert.rejects(s.addFact(c.id, fact('orderId', 'MS-48213', 'Order MS-48213',
+    'http://localhost:5501/orders/MS-48213?q=' + encodeURIComponent('ओटीपी 482913'))), { code: 'SENSITIVE' }, 'Hindi OTP in the query');
+  // A postal PIN code is not a secret, in any of the three languages.
+  for (const excerpt of ['Order MS-48213 PIN code 560001', 'Order MS-48213 पिन कोड 560001', 'Order MS-48213 ಪಿನ್ ಕೋಡ್ 560001', 'Order MS-48213 ಪಿನ್‌ಕೋಡ್ 560001']) {
+    const r = await s.addFact(c.id, fact('orderId', 'MS-48213', excerpt));
+    assert.equal(r.facts[0].excerpt, excerpt, excerpt);
+  }
+});
