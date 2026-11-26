@@ -24,25 +24,28 @@
       </div>
     </form>
     <p id="status" role="status"></p>
-    <section id="case" hidden aria-labelledby="case-title">
-      <h2 id="case-title"></h2>
-      <ul id="facts" aria-label="Saved evidence"></ul>
+    <section id="case" hidden>
+      <div id="timeline"></div>
       <div class="actions">
         <button id="capture" type="button">Read this page</button>
         <button id="support" type="button">Open seller support</button>
+        <button id="save-proof" type="button">Save practice proof</button>
         <button id="open-filing" type="button" hidden>Open practice helpline</button>
       </div>
       <section id="filing" hidden></section>
-      <section id="timeline" hidden></section>
+      <section id="proof-request" hidden aria-labelledby="proof-request-title"></section>
     </section>
   </main>
   <script src="../shared/redact.js"></script>
   <script src="../shared/evidence.js"></script>
   <script src="../shared/i18n.js"></script>
-  <script src="../vendor/case/fake-store.js"></script>
+  <script src="../vendor/case/case-store.js"></script>
+  <script src="../vendor/case/proof.js"></script>
+  <script src="../vendor/case/timeline.js"></script>
   <script src="api.js"></script>
   <script src="voice.js"></script>
   <script src="filing.js"></script>
+  <script src="case-view.js"></script>
   <script src="panel.js"></script>
 </body>
 </html>

@@ -34,13 +34,14 @@ async function openDemo(t) {
       server.once('error', reject);
     })));
   }
-  browser = await chromium.launchPersistentContext(profile, {
-    executablePath: executable,
-    headless: false,
-    args: ['--headless=new', `--disable-extensions-except=${extension}`, `--load-extension=${extension}`, '--no-first-run']
-  });
-  const worker = browser.serviceWorkers()[0] || await browser.waitForEvent('serviceworker', { timeout: 10000 });
-  const ext = 'chrome-extension://' + new URL(worker.url()).host;
+  function launch() {
+    return chromium.launchPersistentContext(profile, {
+      executablePath: executable,
+      headless: false,
+      args: ['--headless=new', `--disable-extensions-except=${extension}`, `--load-extension=${extension}`, '--no-first-run']
+    });
+  }
+  browser = await launch();
   if (!servers) {
     // Contract fixtures let Person 1 test before Person 2's mock server lands.
     await browser.route(seller + '/orders/MS-48213', (route) => route.fulfill({ contentType: 'text/html; charset=utf-8', body:
@@ -50,17 +51,30 @@ async function openDemo(t) {
       '<h1>Practice support</h1><p>Your refund of ₹2,499 will reach you by 12 Nov 2026.</p>'
     }));
   }
-  const site = await browser.newPage();
-  await site.goto(seller + '/orders/MS-48213');
-  const panel = await browser.newPage();
-  panel.setDefaultTimeout(10000);
-  await panel.goto(ext + '/sidepanel/index.html');
-  const id = await panel.evaluate(async (url) => {
-    const [tab] = await chrome.tabs.query({ url: url + '/*' });
-    return tab.id;
-  }, seller);
-  await panel.goto(ext + '/sidepanel/index.html?targetTab=' + id);
-  return { panel, site };
+  async function openPage(url) {
+    const worker = browser.serviceWorkers()[0] || await browser.waitForEvent('serviceworker', { timeout: 10000 });
+    const ext = 'chrome-extension://' + new URL(worker.url()).host;
+    const site = await browser.newPage();
+    await site.goto(url);
+    const panel = await browser.newPage();
+    panel.setDefaultTimeout(10000);
+    await panel.goto(ext + '/sidepanel/index.html');
+    const id = await panel.evaluate(async (pageUrl) => {
+      const tabs = await chrome.tabs.query({});
+      return tabs.find((tab) => tab.url === pageUrl).id;
+    }, site.url());
+    await panel.goto(ext + '/sidepanel/index.html?targetTab=' + id);
+    return { panel, site };
+  }
+
+  return {
+    ...await openPage(seller + '/orders/MS-48213'),
+    async restart(url) {
+      await browser.close();
+      browser = await launch();
+      return openPage(url);
+    }
+  };
 }
 
 test('seller evidence keeps its sources and rejects an invented excerpt', { skip: !executable, timeout: 35000 }, async (t) => {
@@ -72,19 +86,31 @@ test('seller evidence keeps its sources and rejects an invented excerpt', { skip
   });
   await panel.locator('#intent').fill('my refund never came');
   await panel.locator('#start-case').click();
-  await panel.locator('[data-fact="refundAmount"]').waitFor().catch(async (err) => {
+  const timeline = panel.locator('#timeline');
+  const amount = timeline.getByText('₹2,499', { exact: true });
+  await amount.waitFor().catch(async (err) => {
     throw new Error(await panel.locator('#status').innerText() + '\n' + await site.locator('body').innerText(), { cause: err });
   });
-  assert.match(await panel.locator('[data-fact="orderId"]').innerText(), /MS-48213/);
-  assert.equal(await panel.locator('[data-fact="refundAmount"] a').getAttribute('href'), seller + '/orders/MS-48213');
-  assert.doesNotMatch(await panel.locator('#facts').innerText(), /10 Dec 2026|99 Nothing/);
+  await timeline.getByText('MS-48213', { exact: true }).waitFor();
+  assert.ok(await timeline.locator('button[title="' + seller + '/orders/MS-48213"]').count());
+  assert.doesNotMatch(await timeline.innerText(), /10 Dec 2026|99 Nothing/);
 
   await panel.locator('#support').click();
   await site.waitForURL(seller + '/support/MS-48213');
   await panel.locator('#capture').click();
-  await panel.locator('[data-fact="promisedDate"] a[href*="/support/"]').waitFor();
-  assert.match(await panel.locator('[data-fact="promisedDate"] cite').innerText(), /Your refund of ₹2,499 will reach you by 12 Nov 2026/);
-  assert.equal(await panel.locator('#facts li').count(), 3);
+  await timeline.locator('button[title="' + seller + '/support/MS-48213"]').waitFor();
+  await timeline.getByText(/Your refund of ₹2,499 will reach you by 12 Nov 2026/).waitFor();
+  assert.equal(await timeline.locator('button[data-fact]').count(), 3);
+
+  const otherPanel = await panel.context().newPage();
+  await otherPanel.goto(panel.url());
+  await otherPanel.evaluate(async () => {
+    const writer = globalThis.WebSaathiCase.createStore();
+    const activeCase = await writer.getActiveCase();
+    await writer.addEvent(activeCase.id, { kind: 'note', text: 'Saved from another panel' });
+  });
+  await timeline.getByRole('listitem').filter({ hasText: 'Saved from another panel' }).waitFor();
+  await otherPanel.close();
 });
 
 const helpline = 'http://localhost:5502';
@@ -139,10 +165,57 @@ test('filing confirms each value and records the docket only after the user subm
     await fillComplaint(panel, site);
     await panel.getByRole('button', { name: 'Point to Submit complaint' }).waitFor();
     assert.equal(site.url(), helpline + '/file');
-    assert.equal(await panel.locator('#docket-number').count(), 0);
+    assert.equal(await panel.locator('#timeline .wsc-stamp span').count(), 0);
     await site.getByRole('button', { name: 'Submit complaint' }).click();
     await site.waitForURL(/\/docket\//);
-    await panel.locator('#docket-number').waitFor();
-    assert.equal(await panel.locator('#docket-number').innerText(), 'Docket ' + new URL(site.url()).pathname.split('/').at(-1));
-    assert.equal(await panel.locator('#docket-status').innerText(), 'Under review');
+    await panel.locator('#timeline .wsc-stamp span').waitFor();
+    assert.equal(await panel.locator('#timeline .wsc-stamp span').innerText(), new URL(site.url()).pathname.split('/').at(-1));
+    assert.equal(await panel.locator('#timeline .wsc-filed').getByText('Under review', { exact: true }).innerText(), 'Under review');
+  });
+
+test('proof request uses saved evidence and leaves Upload and Send to the user',
+  { skip: !executable || !hasMockSites, timeout: 35000 }, async (t) => {
+    const demo = await openDemo(t);
+    let { panel, site } = demo;
+    await panel.locator('#intent').fill('my refund never came');
+    await panel.locator('#start-case').click();
+    await panel.locator('#save-proof').click();
+    await panel.getByText('Practice proof saved to this case.').waitFor();
+    await panel.locator('#open-filing').click();
+    await site.waitForURL(helpline + '/file');
+    await fillComplaint(panel, site);
+    await panel.getByRole('button', { name: 'Point to Submit complaint' }).waitFor();
+    await site.getByRole('button', { name: 'Submit complaint' }).click();
+    await site.waitForURL(/\/docket\//);
+    await panel.locator('#timeline .wsc-stamp span').waitFor();
+    const portalUrl = site.url();
+
+    const response = await fetch(helpline + '/admin/simulate/' + portalUrl.split('/').at(-1), { method: 'POST' });
+    assert.equal(response.status, 200);
+    if (fs.existsSync(path.join(extension, 'vendor/case/case-store.js'))) {
+      ({ panel, site } = await demo.restart(portalUrl));
+    } else {
+      await site.reload();
+    }
+    await panel.locator('#proof-request-title').waitFor();
+    assert.match(await panel.locator('#proof-request').innerText(), /भुगतान का सबूत/);
+    assert.match(await panel.locator('#proof-name').innerText(), /upi-payment-ms48213\.png/);
+    assert.match(await panel.locator('#proof-draft').innerText(), /proof of payment/i);
+    await panel.getByRole('button', { name: 'Point to Upload document' }).click();
+    const question = panel.getByRole('textbox', { name: 'Ask about this reply' });
+    await question.fill('Press Send for me');
+    await question.press('Enter');
+    await panel.getByText('You need to press Send yourself after reviewing the reply.').waitFor();
+    await question.fill('OTP 482913');
+    await question.press('Enter');
+    await panel.getByText('I can’t use an OTP or other sensitive information.').waitFor();
+    assert.equal(await question.inputValue(), '');
+    assert.equal(await site.locator('#r-file').inputValue(), '');
+    assert.equal(await site.locator('#r-msg').inputValue(), '');
+    assert.equal(await site.locator('.status').innerText(), 'Information needed');
+    await site.locator('#r-file').setInputFiles(path.resolve(__dirname, '../../mock-sites/assets/upi-payment-ms48213.png'));
+    await site.locator('#r-msg').fill(await panel.locator('#proof-draft').innerText());
+    await site.getByRole('button', { name: 'Send', exact: true }).click();
+    await panel.locator('#timeline .wsc-filed').getByText('Reply received, under review', { exact: true }).waitFor();
+    assert.equal(await panel.locator('#proof-request').isVisible(), false);
   });
