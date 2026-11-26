@@ -14,9 +14,9 @@ test('fake store follows the contract', async () => {
   await assert.rejects(s.addFact(c.id, { key: 'orderId', value: 'MS-1', sourceUrl: 'x', excerpt: 'Order ID MS-48213' }), { code: 'BAD_FACT' });
   let r = await s.addFact(c.id, { key: 'orderId', value: 'MS-48213', sourceUrl: 'http://localhost:5501/orders/MS-48213', excerpt: 'Order ID MS-48213' });
   assert.equal(r.facts.length, 1);
-  r = await s.setDocket(c.id, { number: 'NCH-2026-00417', portalUrl: 'http://localhost:5502/docket/NCH-2026-00417', status: 'Under review' });
+  r = await s.setDocket(c.id, { number: 'CHP-2026-00417', portalUrl: 'http://localhost:5502/docket/CHP-2026-00417', status: 'Under review' });
   assert.equal(r.timeline.at(-1).kind, 'filed');
-  r = await s.setDocket(c.id, { number: 'NCH-2026-00417', status: 'Information needed' });
+  r = await s.setDocket(c.id, { number: 'CHP-2026-00417', status: 'Information needed' });
   assert.equal(r.timeline.at(-1).kind, 'status');
   assert.ok(seen.length >= 4);
 });

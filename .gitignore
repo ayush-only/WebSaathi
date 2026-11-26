@@ -23,3 +23,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.log
+
+# practice-site data
+mock-sites/data/
