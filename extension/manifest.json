@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "WebSaathi",
+  "version": "0.2.0",
+  "description": "Carry a refund case across the WebSaathi practice sites.",
+  "minimum_chrome_version": "116",
+  "permissions": ["sidePanel", "storage"],
+  "host_permissions": ["http://localhost/*"],
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "action": { "default_title": "Open WebSaathi" },
+  "background": { "service_worker": "background.js" },
+  "side_panel": { "default_path": "sidepanel/index.html" },
+  "content_scripts": [{
+    "matches": ["http://localhost/*"],
+    "js": ["shared/redact.js", "shared/schema.js", "shared/safety.js", "shared/evidence.js", "content.js"]
+  }]
+}
