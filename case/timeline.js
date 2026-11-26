@@ -36,6 +36,7 @@
 .wsc-next{background:var(--r);border-radius:12px;padding:12px 16px;display:grid;gap:4px}
 .wsc-next b{font-weight:500;font-size:13px;color:var(--i2)}
 .wsc-next p{margin:0;font-size:15px;line-height:22px}
+.wsc-next.need{box-shadow:inset 3px 0 0 #b54708}
 .wsc-list{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:12px;background:var(--c)}
 .wsc-list>li{padding:12px 16px;border-top:1px solid var(--line);display:grid;gap:4px}
 .wsc-list>li:first-child{border-top:0}
@@ -45,7 +46,7 @@
 .wsc-src{display:flex;gap:6px;align-items:baseline;font-size:12px;line-height:16px;color:var(--m);min-width:0}
 .wsc-src button{all:unset;cursor:pointer;color:var(--a);text-decoration:underline;text-underline-offset:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}
 .wsc-src button:focus-visible,.wsc-file:focus-visible{outline:2px solid var(--a);outline-offset:2px;border-radius:4px}
-.wsc-q{color:var(--m);font-size:12px;line-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wsc-q{color:var(--m);font-size:12px;line-height:16px;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow-wrap:anywhere}
 .wsc-empty{color:var(--m);padding:12px 16px}
 .wsc-stamp{display:inline-grid;gap:2px;border:1.5px solid var(--a);border-radius:8px;padding:8px 12px;color:var(--a)}
 .wsc-stamp small{font-size:12px;line-height:16px;color:var(--i2)}
@@ -57,8 +58,10 @@
 .wsc-thumb{width:40px;height:40px;border-radius:8px;background:var(--r);object-fit:cover}
 .wsc-tl{list-style:none;margin:0;padding:0}
 .wsc-tl li{position:relative;padding:0 0 12px 20px;font-size:13px;line-height:18px}
+.wsc-tl li:not(:last-child)::after{content:"";position:absolute;left:6.5px;top:15px;bottom:-3px;width:1px;background:var(--line)}
 .wsc-tl li::before{content:"";position:absolute;left:3px;top:5px;width:8px;height:8px;border-radius:4px;border:1.5px solid var(--i2);background:var(--c)}
 .wsc-tl li.request::before{background:#b54708;border-color:#b54708}
+.wsc-tl li.filed::before{background:var(--a);border-color:var(--a)}
 .wsc-tl time{display:block;color:var(--m);font-size:12px;line-height:16px}
 `;
 
@@ -88,7 +91,7 @@
     const need = c.nextAction && c.nextAction.kind === 'respond';
     const html = `<div class="wsc">
  <p class="wsc-title">${esc(c.title)}</p>
- ${c.nextAction ? `<div class="wsc-next" role="status"><b>${esc(t.next)}</b><p>${esc(c.nextAction.text)}</p></div>` : ''}
+ ${c.nextAction ? `<div class="wsc-next${need ? ' need' : ''}" role="status"><b>${esc(t.next)}</b><p>${esc(c.nextAction.text)}</p></div>` : ''}
  <section><h3>${esc(t.facts)}</h3>${facts.length ? `<ul class="wsc-list">${facts.map((f, i) => `<li>
    <div class="wsc-row"><span class="wsc-k">${esc(t.keys[f.key] || f.key)}</span><span class="wsc-v${f.key === 'orderId' ? ' wsc-mono' : ''}">${esc(f.value)}</span></div>
    <div class="wsc-src">${esc(t.from)} <button type="button" data-fact="${i}" title="${esc(f.sourceUrl)}">${esc(short(f.sourceUrl))}</button></div>
