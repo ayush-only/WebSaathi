@@ -4,9 +4,11 @@
  *   createStore({ storage })       → any adapter with get/set/remove/onChanged (tests)
  *   createFakeStore()              → same store on an in-memory adapter
  * Needs the "storage" and "unlimitedStorage" permissions (attachments are data URLs up to 2 MB each).
- * Writes are serialised across every extension page and the service worker (Web Locks), so two open panels never
- * overwrite each other. Without Web Locks (Node tests) the storage adapter's own lock, or a per-store queue, is used.
- * Excerpts and values that look like a card number, Aadhaar, UPI ID or OTP are refused; URLs are stored without query or hash.
+ * Write guarantee: with the Web Locks API (every extension page and the service worker), each change to a case runs
+ * under navigator.locks 'wsCase:<id>', so two open panels never lose each other's writes to the same case; the list
+ * of cases has its own lock, 'wsCase:index'. Without Web Locks, writes are serialised per store instance only.
+ * A fact whose value, excerpt or sourceUrl (query string included) looks like a card number, Aadhaar, UPI ID or OTP
+ * is refused. URLs are stored without query or hash.
  * nextAction is recomputed after every change (see nextActionFor); setNextAction overrides it until the next change.
  */
 (function (root, factory) {
@@ -28,6 +30,8 @@
     /[\w.-]+@(ok\w+|ybl|ibl|axl|paytm|upi|apl|yapl|ikwik|fbl|pthdfc|ptsbi|ptyes|ptaxis)\b/i  // UPI IDs
   ];
   const looksSecret = (s) => SECRET_RES.some((re) => re.test(String(s || '')));
+  /** URLs are checked raw and percent-decoded (query string included), e.g. ?otp=482913 or ?otp%3D482913. */
+  const urlLooksSecret = (u) => { let d = String(u || ''); try { d = decodeURIComponent(d.replace(/\+/g, ' ')); } catch (_) { /* bad escape */ } return looksSecret(u) || looksSecret(d); };
   const PREFIX = 'wsCase:';
   const INDEX = 'wsCase.index';
   const ACTIVE = 'wsCase.active';
@@ -62,10 +66,14 @@
     const data = new Map();
     const subs = new Set();
     const emit = (changes) => subs.forEach((f) => { try { f(changes); } catch (_) { /* listener error */ } });
-    let chain = Promise.resolve();
+    const chains = new Map();
     return {
-      /** One lock per adapter, shared by every store on it (stands in for navigator.locks in Node). */
-      lock(fn) { const run = chain.then(fn, fn); chain = run.catch(() => {}); return run; },
+      /** Named locks shared by every store on this adapter: same contract as navigator.locks.request(name, fn). */
+      lock(name, fn) {
+        const run = (chains.get(name) || Promise.resolve()).then(() => fn());
+        chains.set(name, run.catch(() => {}));
+        return run;
+      },
       async get(keys) {
         const ks = keys == null ? [...data.keys()] : [].concat(keys);
         const out = {};
@@ -105,35 +113,45 @@
   // ---------------------------------------------------------------- the store
   function createStore(opts) {
     const storage = (opts && opts.storage) || chromeStorage();
+    // lock(name, fn): Web Locks when the browser has them (shared by all extension pages and the service worker),
+    // else the storage adapter's named locks (Node tests), else none.
     const locks = root.navigator && root.navigator.locks;
     const lock = (opts && opts.lock) || (storage.lock && storage.lock.bind(storage))
-      || (locks ? (fn) => locks.request('wsCase.write', () => fn()) : null);
+      || (locks && typeof locks.request === 'function' ? (name, fn) => locks.request(name, () => fn()) : null);
     let queue = Promise.resolve();
-    // Every read-modify-write runs under the shared lock, so stores in other pages can't interleave with it.
-    const serial = (fn) => { const task = () => (lock ? lock(fn) : fn()); const run = queue.then(task, task); queue = run.catch(() => {}); return run; };
+    /** Runs fn under the named lock; without locks, in this instance's queue (the fallback guarantee). */
+    const serial = (name, fn) => {
+      if (lock) return lock(name, fn);
+      const run = queue.then(fn, fn); queue = run.catch(() => {}); return run;
+    };
+    /** For a second lock taken inside serial(): always case lock first, then the index lock, so no deadlock. */
+    const nested = (name, fn) => (lock ? lock(name, fn) : fn());
+    const caseLock = (id) => 'wsCase:' + id;
+    const INDEX_LOCK = 'wsCase:index';
 
     const read = async (id) => (await storage.get(PREFIX + id))[PREFIX + id] || null;
     const must = async (id) => { const c = await read(id); if (!c) throw err('NO_CASE', 'no case ' + id); return c; };
     async function write(c, { keepNext } = {}) {
       c.updatedAt = Date.now();
       if (!keepNext) c.nextAction = nextActionFor(c);
-      const idx = (await storage.get(INDEX))[INDEX] || [];
-      await storage.set({ [PREFIX + c.id]: c, [INDEX]: idx.includes(c.id) ? idx : idx.concat(c.id) });
+      await storage.set({ [PREFIX + c.id]: c });
       return clone(c);
     }
+    const addToIndex = (id) => nested(INDEX_LOCK, async () => {
+      const idx = (await storage.get(INDEX))[INDEX] || [];
+      if (!idx.includes(id)) await storage.set({ [INDEX]: idx.concat(id) });
+    });
     const event = (c, kind, text, sourceUrl) => c.timeline.push({ at: Date.now(), kind, text: String(text).slice(0, 300), sourceUrl: cleanUrl(sourceUrl) || null });
-    const mutate = (id, fn, o) => serial(async () => { const c = await must(id); const r = await fn(c); const saved = await write(c, o); return r === undefined ? saved : r; });
+    const mutate = (id, fn, o) => serial(caseLock(id), async () => { const c = await must(id); const r = await fn(c); const saved = await write(c, o); return r === undefined ? saved : r; });
 
     return {
       FACT_KEYS,
       createCase(title) {
-        return serial(async () => {
-          const now = Date.now();
-          const c = { id: rid('case_'), title: normalize(title || 'New case').slice(0, 120), createdAt: now, updatedAt: now,
-            facts: [], attachments: [], docket: null, timeline: [], nextAction: null };
-          event(c, 'note', 'Case opened');
-          return write(c);
-        });
+        const now = Date.now();
+        const c = { id: rid('case_'), title: normalize(title || 'New case').slice(0, 120), createdAt: now, updatedAt: now,
+          facts: [], attachments: [], docket: null, timeline: [], nextAction: null };
+        event(c, 'note', 'Case opened');
+        return serial(caseLock(c.id), async () => { const saved = await write(c); await addToIndex(c.id); return saved; });
       },
       async getCase(id) { return clone(await read(id)); },
       async listCases() {
@@ -152,7 +170,8 @@
         const sourceUrl = cleanUrl(f.sourceUrl);
         if (!sourceUrl) return Promise.reject(err('BAD_FACT', 'sourceUrl must be an http(s) URL'));
         if (!excerpt.includes(value)) return Promise.reject(err('BAD_FACT', 'excerpt does not contain value'));
-        if (looksSecret(value) || looksSecret(excerpt)) return Promise.reject(err('SENSITIVE', 'looks like a card, Aadhaar, UPI or OTP value'));
+        // The same check on the whole fact: value, excerpt and the full sourceUrl before its query is stripped.
+        if (looksSecret(value) || looksSecret(excerpt) || urlLooksSecret(f.sourceUrl)) return Promise.reject(err('SENSITIVE', 'looks like a card, Aadhaar, UPI or OTP value'));
         return mutate(id, (c) => {
           const prev = c.facts.find((x) => x.key === f.key);
           const name = labelOf(f.key).replace(/^the /, '');
@@ -206,10 +225,12 @@
       },
 
       deleteCase(id) {
-        return serial(async () => {
-          const idx = ((await storage.get(INDEX))[INDEX] || []).filter((x) => x !== id);
-          const active = (await storage.get(ACTIVE))[ACTIVE];
-          await storage.set(Object.assign({ [INDEX]: idx }, active === id ? { [ACTIVE]: null } : {}));
+        return serial(caseLock(id), async () => {
+          await nested(INDEX_LOCK, async () => {
+            const idx = ((await storage.get(INDEX))[INDEX] || []).filter((x) => x !== id);
+            const active = (await storage.get(ACTIVE))[ACTIVE];
+            await storage.set(Object.assign({ [INDEX]: idx }, active === id ? { [ACTIVE]: null } : {}));
+          });
           await storage.remove(PREFIX + id);
         });
       },

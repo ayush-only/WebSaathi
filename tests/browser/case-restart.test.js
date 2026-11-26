@@ -48,8 +48,9 @@ test('case survives a browser restart', { skip: exe ? false : 'Chrome not found'
   t.after(() => { fs.rmSync(userDir, { recursive: true, force: true }); fs.rmSync(ext, { recursive: true, force: true }); });
   const proofUrl = 'data:image/png;base64,' + fs.readFileSync(PROOF).toString('base64');
 
-  await t.test('session 1: build the case; a second page sees each change', async () => {
+  await t.test('session 1: build the case; a second page sees each change', async (st) => {
     const { ctx, open } = await launch(userDir, ext);
+    st.after(() => ctx.close().catch(() => {})); // close Chrome even when an assertion fails, so the run never hangs
     const a = await open();
     const b = await open();
     await b.evaluate(() => { window.seen = []; store.onChange((c) => window.seen.push(c.nextAction.kind)); });
@@ -66,19 +67,27 @@ test('case survives a browser restart', { skip: exe ? false : 'Chrome not found'
     const seen = await b.evaluate(() => window.seen);
     assert.ok(seen.includes('collect') && seen.includes('file') && seen.includes('wait'), seen.join(','));
 
-    // Two open panels writing at the same moment: each page has its own store, so only the shared lock keeps both writes.
-    const write = (p, from) => p.evaluate(async (who) => {
-      const c = await store.getActiveCase();
-      await Promise.all([1, 2, 3, 4, 5].map((i) => store.addEvent(c.id, { kind: 'note', text: `note ${who}${i}` })));
-    }, from);
+    // BOTH pages write to the same case at the same moment. Each page has its own store instance, so only the
+    // Web Lock 'wsCase:<id>' (shared by extension pages) keeps every write.
+    const caseId = await a.evaluate(async () => (await store.getActiveCase()).id);
+    const write = (p, who) => p.evaluate(async ([id, w]) => {
+      await new Promise((r) => setTimeout(r, 300 - (Date.now() % 300))); // line both pages up on the same tick
+      await Promise.all([1, 2, 3, 4, 5].map((i) => store.addEvent(id, { kind: 'note', text: `note ${w}${i}` }))
+        .concat(store.addAttachment(id, { name: `receipt-${w}.png`, type: 'receipt', dataUrl: 'data:image/png;base64,iVBORw0KGgo=' })));
+    }, [caseId, who]);
     await Promise.all([write(a, 'a'), write(b, 'b')]);
-    const notes = await a.evaluate(async () => (await store.getActiveCase()).timeline.filter((e) => /^note [ab]\d$/.test(e.text)).length);
-    assert.equal(notes, 10, 'no note from either page was lost');
+    const after = await b.evaluate(async (id) => {
+      const c = await store.getCase(id);
+      return { notes: c.timeline.filter((e) => /^note [ab]\d$/.test(e.text)).map((e) => e.text).sort(), files: c.attachments.map((x) => x.name).sort() };
+    }, caseId);
+    assert.deepEqual(after.notes, ['note a1', 'note a2', 'note a3', 'note a4', 'note a5', 'note b1', 'note b2', 'note b3', 'note b4', 'note b5']);
+    assert.deepEqual(after.files, ['receipt-a.png', 'receipt-b.png', 'upi-payment-ms48213.png']);
     await ctx.close();
   });
 
-  await t.test('session 2: Chrome reopened; the case is there and the proof request can be answered', async () => {
+  await t.test('session 2: Chrome reopened; the case is there and the proof request can be answered', async (st) => {
     const { ctx, open } = await launch(userDir, ext);
+    st.after(() => ctx.close().catch(() => {})); // close Chrome even when an assertion fails, so the run never hangs
     const p = await open();
     const r = await p.evaluate(async () => {
       const c = await store.getActiveCase();

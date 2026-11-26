@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const src = path.join(__dirname, '..', 'case');
 const dst = path.join(__dirname, '..', 'extension', 'vendor', 'case');
+require('./build-fake-store.js').build(); // case/fake-store.js must stay self-contained
 fs.mkdirSync(dst, { recursive: true });
 for (const f of fs.readdirSync(src)) if (f.endsWith('.js')) fs.copyFileSync(path.join(src, f), path.join(dst, f));
 console.log('synced case/*.js → extension/vendor/case/');

@@ -140,3 +140,64 @@ test('store: the same fact from a second page keeps the earlier source in the ti
   assert.equal(earlier[0].sourceUrl, 'http://localhost:5501/orders/MS-48213');
   assert.match(earlier[0].text, /“Refund by 12 Nov 2026”/);
 });
+
+test('store: an OTP anywhere in the fact is refused: value, excerpt or sourceUrl query (Codex, #6 item 1)', async () => {
+  const s = C.createFakeStore();
+  const c = await s.createCase('x');
+  const order = 'http://localhost:5501/orders/MS-48213';
+  await assert.rejects(s.addFact(c.id, fact('orderId', 'MS-48213', 'Order ID MS-48213. OTP: 482913')), { code: 'SENSITIVE' });
+  await assert.rejects(s.addFact(c.id, fact('orderId', 'MS-48213', 'Order ID MS-48213', order + '?otp=482913')), { code: 'SENSITIVE' });
+  await assert.rejects(s.addFact(c.id, fact('orderId', 'MS-48213', 'Order ID MS-48213', order + '?q=otp%3D482913')), { code: 'SENSITIVE' });
+  await assert.rejects(s.addFact(c.id, fact('orderId', 'MS-48213', 'Order ID MS-48213', order + '?vpa=ravi@okhdfc')), { code: 'SENSITIVE' });
+  const r = await s.addFact(c.id, fact('orderId', 'MS-48213', 'Order ID MS-48213', order + '?ref=email'));
+  assert.equal(r.facts[0].sourceUrl, order, 'a harmless query is allowed and stripped');
+});
+
+test('store: each mutation takes the lock wsCase:<id>; the case list takes wsCase:index (Codex, #6 item 2)', async () => {
+  const names = [];
+  const storage = C.memoryStorage();
+  const recording = (name, fn) => { names.push(name); return storage.lock(name, fn); };
+  const s = C.createStore({ storage, lock: recording });
+  const c = await s.createCase('x');
+  await s.addEvent(c.id, { kind: 'note', text: 'hello' });
+  await s.deleteCase(c.id);
+  assert.deepEqual(names, ['wsCase:' + c.id, 'wsCase:index', 'wsCase:' + c.id, 'wsCase:' + c.id, 'wsCase:index']);
+});
+
+test('store: without Web Locks or an adapter lock, one instance still queues its own writes (fallback)', async () => {
+  const vm = require('node:vm');
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const page = { navigator: {} }; // a browser without the Web Locks API
+  page.globalThis = page;
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'case', 'case-store.js'), 'utf8'), page);
+  const storage = page.WebSaathiCase.memoryStorage();
+  delete storage.lock;
+  const s = page.WebSaathiCase.createStore({ storage });
+  const c = await s.createCase('x');
+  await Promise.all([1, 2, 3, 4, 5].map((i) => s.addEvent(c.id, { kind: 'note', text: 'n' + i })));
+  assert.equal((await s.getCase(c.id)).timeline.length, 6);
+});
+
+test('fake-store.js works when loaded on its own, like a page that only includes that file (Codex, #6 item 3)', () => {
+  const vm = require('node:vm');
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'case', 'fake-store.js'), 'utf8');
+  const page = { navigator: undefined };
+  page.globalThis = page;
+  vm.runInNewContext(src, page);
+  assert.equal(typeof page.WebSaathiCase.createFakeStore, 'function');
+  assert.equal(typeof page.WebSaathiCase.createStore, 'function');
+  assert.equal(typeof page.WebSaathiCase.missingFacts, 'function');
+  const store = page.WebSaathiCase.createFakeStore();
+  return store.createCase('Refund for order MS-48213').then((c) => assert.equal(c.nextAction.kind, 'collect'));
+});
+
+test('fake-store.js is the store, regenerated from case-store.js (npm run sync:case)', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const dir = path.join(__dirname, '..', 'case');
+  const fake = fs.readFileSync(path.join(dir, 'fake-store.js'), 'utf8');
+  assert.ok(fake.endsWith(fs.readFileSync(path.join(dir, 'case-store.js'), 'utf8')), 'run npm run sync:case after changing case-store.js');
+});
