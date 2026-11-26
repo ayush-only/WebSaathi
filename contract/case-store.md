@@ -1,6 +1,11 @@
 # Contract: the case store API
 
-Person 2 owns the implementation (`case/case-store.js`). Person 1 only calls these functions. Until the real store is merged, use `case/fake-store.js` (same API, in memory).
+Person 2 owns the implementation (`case/case-store.js`). Person 1 only calls these functions.
+
+- `WebSaathiCase.createStore()` — backed by `chrome.storage.local`; survives a browser restart. The extension manifest needs the `storage` and `unlimitedStorage` permissions (attachments are data URLs up to 2 MB each).
+- `WebSaathiCase.createFakeStore()` — the same store in memory, for tests.
+
+Writes are queued, so two quick calls never overwrite each other.
 
 All functions are **async** (return Promises). Errors are thrown as `Error` with a `code` property.
 
@@ -10,19 +15,27 @@ All functions are **async** (return Promises). Errors are thrown as `Error` with
 | `getCase(id)` | `Case \| null` | |
 | `listCases()` | `Case[]` | Newest `updatedAt` first. |
 | `getActiveCase()` / `setActiveCase(id)` | `Case \| null` / `void` | The case the side panel is working on; survives restart. |
-| `addFact(id, fact)` | `Case` | Throws `BAD_FACT` if a field is missing or `excerpt` does not contain `value`. Adds a `fact` event. |
-| `addAttachment(id, {name, type, mime, dataUrl})` | `Attachment` | Throws `TOO_LARGE` over 2 MB. |
+| `addFact(id, fact)` | `Case` | Throws `BAD_FACT` if a field is missing or `excerpt` does not contain `value`; `SENSITIVE` if the value looks like a card number, UPI ID or OTP. Adds a `fact` event. |
+| `addAttachment(id, {name, type, mime, dataUrl})` | `Attachment` | Throws `TOO_LARGE` over 2 MB. `mime` is optional (read from the data URL). |
+| `removeAttachment(id, attachmentId)` | `Case` | Adds a `note` event. |
 | `setDocket(id, docket)` | `Case` | Adds a `filed` event the first time, `status` events after. |
-| `addEvent(id, {kind, text, sourceUrl})` | `Case` | For `request`, `reply`, `note`. |
-| `setNextAction(id, next)` | `Case` | |
-| `onChange(callback)` | `unsubscribe()` | `callback(case)` after any change. |
+| `addEvent(id, {kind, text, sourceUrl})` | `Case` | For `request`, `reply`, `note`. The same event twice in a row (e.g. page reload) is ignored. |
+| `setNextAction(id, next)` | `Case` | Overrides the computed next step until the next change. |
+| `deleteCase(id)` | `void` | Clears the active case if it was this one. |
+| `onChange(callback)` | `unsubscribe()` | `callback(case)` after any change, in this page or another extension page. |
+
+`nextAction` is recomputed after every change with `nextActionFor(case)`: `collect` until all three facts are saved, then `file`, then `wait`; `respond` when the last `request` event has no `reply` after it; `done` when the docket status says resolved or closed.
 
 Helpers (also in `case/`, Person 2):
 
-| Function | Returns |
-|---|---|
-| `missingFacts(case)` | keys still needed before filing: `['refundAmount', …]` |
-| `draftProofReply(case, requestText)` | `{ attachmentId, text }` or `null` when no suitable attachment |
-| `renderTimeline(containerEl, case, { onSourceClick })` | draws the case timeline into the side panel |
+| Function | File | Returns |
+|---|---|---|
+| `missingFacts(case)` | case-store.js | keys still needed before filing: `['refundAmount', …]` |
+| `nextActionFor(case)` | case-store.js | the computed `NextAction` |
+| `excerptOnPage(pageText, excerpt)` | proof.js | `true` if the excerpt is in the visible text (whitespace-normalised) |
+| `isRequestForProof(text)` | proof.js | `true` if the page text asks for proof of payment |
+| `draftProofReply(case, requestText)` | proof.js | `{ attachmentId, attachmentName, text }` or `null` when no suitable attachment |
+| `explainRequest(case, requestText, lang)` | proof.js | one short spoken explanation, `lang` = `en` / `hi` / `kn` |
+| `renderTimeline(containerEl, case, { lang, onSourceClick, onAttachmentClick })` | timeline.js | draws the case view into the side panel |
 
-Loading: every file in `case/` is a UMD module. In the extension it sets `globalThis.WebSaathiCase`; in Node it is `require()`-able.
+Loading: every file in `case/` is a UMD module. In the extension it sets `globalThis.WebSaathiCase`; in Node it is `require()`-able. Chrome can't load files outside `extension/`, so `npm run sync:case` copies `case/*.js` to `extension/vendor/case/`.
