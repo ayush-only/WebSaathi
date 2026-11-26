@@ -37,8 +37,11 @@
   function labelOf(el) {
     const referred = (el.getAttribute('aria-labelledby') || '').split(/\s+/)
       .map((id) => document.getElementById(id)?.innerText || '').join(' ').trim();
-    return (referred || el.getAttribute('aria-label') || el.labels?.[0]?.innerText
-      || (el.tagName === 'BUTTON' ? el.innerText : '') || el.name || '').replace(/\s*\*\s*$/, '').trim();
+    const label = el.labels?.[0]?.cloneNode(true);
+    label?.querySelectorAll('input, textarea, select, .hint, .err, [role="alert"], [aria-hidden="true"]')
+      .forEach((node) => node.remove());
+    return (referred || el.getAttribute('aria-label') || label?.textContent
+      || (el.tagName === 'BUTTON' ? el.innerText : '') || el.name || '').replace(/\s*\*\s*$/, '').replace(/\s+/g, ' ').trim();
   }
 
   function describe(el) {

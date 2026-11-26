@@ -2,10 +2,11 @@
   'use strict';
   const WS = globalThis.WebSaathi;
   const cases = globalThis.WebSaathiCase;
-  const { SELLER, ORDER, supportPath, pageKind, safeUrl, localFacts, validateFact } = WS.evidence;
+  const { SELLER, HELPLINE, ORDER, supportPath, pageKind, safeUrl, localFacts, validateFact, readDocket } = WS.evidence;
   const $ = (selector) => document.querySelector(selector);
   const store = cases.createFakeStore();
   const required = ['orderId', 'refundAmount', 'promisedDate'];
+  const labels = { orderId: 'Order ID', refundAmount: 'Refund amount', promisedDate: 'Promised refund date' };
   const ui = {
     en: ['What happened with your refund?', 'My refund never came', 'Start refund case', 'Read this page', 'Open seller support'],
     hi: ['आपके रिफंड का क्या हुआ?', 'मेरा रिफंड नहीं आया', 'रिफंड का मामला शुरू करें', 'इस पेज से सबूत पढ़ें', 'विक्रेता की चैट खोलें'],
@@ -14,18 +15,13 @@
   let lang = 'en';
   let currentCase = null;
   let busy = false;
+  let filingTab = null;
+  let refreshQueued = false;
+  let refreshTimer;
   const targetTab = Number(new URLSearchParams(location.search).get('targetTab')) || null;
 
-  const t = (key, vars) => WS.i18n.t(lang, key, vars);
-  let statusMessage;
-  function message(key, vars) {
-    statusMessage = { key, vars };
-    renderStatus();
-  }
-
-  function renderStatus() {
-    if (statusMessage) $('#status').textContent = t(statusMessage.key, statusMessage.vars);
-  }
+  function message(text) { $('#status').textContent = text; }
+  const filing = WS.filing.create($('#filing'), message, (page) => { filingTab = page.tabId; });
 
   function applyLanguage() {
     document.documentElement.lang = lang;
@@ -35,10 +31,7 @@
     $('#start-case').textContent = start;
     $('#capture').textContent = capture;
     $('#support').textContent = support;
-    $('#mic').textContent = t('speak');
-    if ($('#open-filing')) $('#open-filing').textContent = t('openFiling');
-    if ($('#save-proof')) $('#save-proof').textContent = t('saveProof');
-    renderStatus();
+    $('#mic').textContent = WS.i18n.t(lang, 'speak');
   }
 
   function render() {
@@ -46,12 +39,20 @@
     $('#case').hidden = !currentCase;
     if (!currentCase) return;
     $('#case-title').textContent = currentCase.title;
+    $('#open-filing').hidden = !!currentCase.docket || cases.missingFacts(currentCase).length > 0;
+    if (currentCase.docket) {
+      $('#timeline').hidden = false;
+      $('#timeline').replaceChildren(
+        WS.filing.element('h3', 'Docket ' + currentCase.docket.number, { id: 'docket-number' }),
+        WS.filing.element('p', currentCase.docket.status, { id: 'docket-status' })
+      );
+    }
     const facts = [...currentCase.facts].sort((a, b) => required.indexOf(a.key) - required.indexOf(b.key));
     $('#facts').replaceChildren(...facts.map((fact) => {
       const li = document.createElement('li');
       li.dataset.fact = fact.key;
       const title = document.createElement('strong');
-      title.textContent = t(fact.key) + ': ' + fact.value;
+      title.textContent = labels[fact.key] + ': ' + fact.value;
       const quote = document.createElement('cite');
       quote.textContent = fact.excerpt;
       const url = safeUrl(fact.sourceUrl);
@@ -98,14 +99,51 @@
       currentCase = await store.addFact(currentCase.id, fact);
     }
     const missing = cases.missingFacts(currentCase);
+    const next = missing.length
+      ? { kind: 'collect', text: 'Read the seller’s order or support page.' }
+      : { kind: 'file', text: 'Review and file your refund complaint.' };
+    currentCase = await store.setNextAction(currentCase.id, next);
     render();
-    message(missing.length ? 'needFacts' : 'factsReady', { fields: missing.map((key) => t(key)).join(', ') });
+    message(missing.length ? 'Still needed: ' + missing.map((key) => labels[key]).join(', ') : 'Evidence is ready to review.');
+  }
+
+  async function refresh() {
+    const page = await scan();
+    if (!currentCase) return;
+    if (page?.kind === 'file' && !currentCase.docket) {
+      if (!cases.missingFacts(currentCase).length) filing.show(page, currentCase, true);
+      return;
+    }
+    filing.hide();
+    if (page?.kind !== 'docket') return;
+    const docket = readDocket(page);
+    if (!docket || (currentCase.docket ? currentCase.docket.number !== docket.number : filingTab !== page.tabId)) return;
+    if (docket.status !== currentCase.docket?.status) {
+      currentCase = await store.setDocket(currentCase.id, docket);
+      currentCase = await store.setNextAction(currentCase.id, { kind: 'wait', text: 'Check the portal for a reply.' });
+    }
+    render();
+    message('Docket saved. Open it again to check for a reply.');
+  }
+
+  function scheduleRefresh() {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+      if (busy) refreshQueued = true;
+      else run(refresh);
+    }, 120);
   }
 
   function run(task) {
     if (busy) return;
     busy = true;
-    task().catch(() => message('stepFailed')).finally(() => { busy = false; });
+    const controls = document.querySelectorAll('#start-case, #capture, #support, #open-filing');
+    controls.forEach((button) => { button.disabled = true; });
+    task().catch(() => message('Could not complete this step. Try again.')).finally(() => {
+      busy = false;
+      controls.forEach((button) => { button.disabled = false; });
+      if (refreshQueued) { refreshQueued = false; scheduleRefresh(); }
+    });
   }
 
   $('#start').addEventListener('submit', (ev) => {
@@ -113,7 +151,7 @@
     run(async () => {
       const page = await scan();
       if (!['order', 'support'].includes(page?.kind)) {
-        message('sellerFirst');
+        message('Open the WebSaathi practice seller order or support page first.');
         return;
       }
       currentCase = await store.createCase('Refund for order ' + ORDER);
@@ -124,17 +162,24 @@
   });
   $('#capture').addEventListener('click', () => run(async () => {
     const page = await scan();
-    if (!['order', 'support'].includes(page?.kind)) { message('sellerPage'); return; }
+    if (!['order', 'support'].includes(page?.kind)) { message('Open the practice seller order or support page.'); return; }
     await capture(page);
   }));
   $('#support').addEventListener('click', () => run(async () => {
     const tab = await activeTab();
     await chrome.tabs.update(tab.id, { url: SELLER + supportPath });
   }));
+  $('#open-filing').addEventListener('click', () => run(async () => {
+    const tab = await activeTab();
+    await chrome.tabs.update(tab.id, { url: HELPLINE + '/file' });
+  }));
+  chrome.tabs.onActivated.addListener(scheduleRefresh);
+  chrome.tabs.onUpdated.addListener((_id, change) => {
+    if (change.status === 'complete') scheduleRefresh();
+  });
   $('#lang').addEventListener('change', () => {
     lang = $('#lang').value;
     applyLanguage();
-    render();
     chrome.storage.local.set({ lang }).catch(() => {});
   });
   $('#mic').addEventListener('click', async () => {
@@ -145,7 +190,7 @@
       if (['not-allowed', 'service-not-allowed'].includes(err.message)) {
         await chrome.tabs.create({ url: chrome.runtime.getURL('pages/mic.html') });
       }
-      message('noSpeech');
+      message(WS.i18n.t(lang, 'noSpeech'));
     }
   });
 
