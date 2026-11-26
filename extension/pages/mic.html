@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WebSaathi — Allow microphone</title>
+  <style>
+    body { font: 18px/1.5 system-ui, sans-serif; color: #14163a; max-width: 560px; margin: 48px auto; padding: 0 16px; }
+    h1 { color: #1b1f6b; }
+    button { font: 700 18px system-ui, sans-serif; padding: 12px 20px; border-radius: 12px; border: 2px solid #14163a; background: #fd9b36; cursor: pointer; }
+    #status { font-weight: 700; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <h1>Allow WebSaathi to hear you</h1>
+  <p>Chrome asks for microphone permission once. Press the button and choose <strong>Allow</strong>. WebSaathi only listens while the microphone button in the side panel is active, and never while you type a password, OTP or PIN.</p>
+  <p lang="hi">माइक्रोफ़ोन की अनुमति के लिए बटन दबाएँ और <strong>Allow</strong> चुनें।</p>
+  <p lang="kn">ಮೈಕ್ರೋಫೋನ್ ಅನುಮತಿಗೆ ಬಟನ್ ಒತ್ತಿ <strong>Allow</strong> ಆರಿಸಿ.</p>
+  <button type="button" id="allow">🎤 Allow microphone</button>
+  <p id="status" role="status"></p>
+  <script src="mic.js"></script>
+</body>
+</html>

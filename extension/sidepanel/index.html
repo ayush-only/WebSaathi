@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WebSaathi</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header>
+    <img src="../icons/icon48.png" alt="" width="32" height="32">
+    <h1>WebSaathi</h1>
+    <select id="lang" aria-label="Language">
+      <option value="en">English</option><option value="hi">हिन्दी</option><option value="kn">ಕನ್ನಡ</option>
+    </select>
+  </header>
+  <main>
+    <form id="start">
+      <label for="intent" id="intent-label">What happened with your refund?</label>
+      <textarea id="intent" required rows="2" placeholder="My refund never came" maxlength="400"></textarea>
+      <div class="actions">
+        <button id="mic" type="button">Speak</button>
+        <button id="start-case" type="submit">Start refund case</button>
+      </div>
+    </form>
+    <p id="status" role="status"></p>
+    <section id="case" hidden aria-labelledby="case-title">
+      <h2 id="case-title"></h2>
+      <ul id="facts" aria-label="Saved evidence"></ul>
+      <div class="actions">
+        <button id="capture" type="button">Read this page</button>
+        <button id="support" type="button">Open seller support</button>
+      </div>
+      <section id="filing" hidden></section>
+      <section id="timeline" hidden></section>
+    </section>
+  </main>
+  <script src="../shared/redact.js"></script>
+  <script src="../shared/evidence.js"></script>
+  <script src="../shared/i18n.js"></script>
+  <script src="../vendor/case/fake-store.js"></script>
+  <script src="api.js"></script>
+  <script src="voice.js"></script>
+  <script src="panel.js"></script>
+</body>
+</html>
