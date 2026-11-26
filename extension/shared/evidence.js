@@ -24,7 +24,7 @@
       if (origin === SELLER && pathname === orderPath) return 'order';
       if (origin === SELLER && pathname === supportPath) return 'support';
       if (origin === HELPLINE && pathname === '/file') return 'file';
-      if (origin === HELPLINE && /^\/docket\/(?:NCH|CHP)-\d{4}-\d+$/.test(pathname)) return 'docket';
+      if (origin === HELPLINE && /^\/docket\/CHP-\d{4}-\d+$/.test(pathname)) return 'docket';
     } catch (_) { /* invalid URL */ }
     return null;
   }
@@ -75,7 +75,7 @@
 
   function readDocket(page) {
     if (pageKind(page.url) !== 'docket') return null;
-    const number = /\bDocket number\s*:?\s*((?:NCH|CHP)-\d{4}-\d+)\b/i.exec(page.text)?.[1];
+    const number = /\bDocket number\s*:?\s*(CHP-\d{4}-\d+)\b/i.exec(page.text)?.[1];
     const status = /\bStatus\s*:?\s*(Reply received, under review|Information needed|Under review|Resolved)\b/i.exec(page.text)?.[1];
     if (!number || !status || !page.url.endsWith('/' + number)) return null;
     return { number, status, portalUrl: safeUrl(page.url) };

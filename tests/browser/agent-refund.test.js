@@ -102,6 +102,13 @@ async function fillComplaint(panel, site) {
   ];
   for (const [field, answer, expected] of values) {
     if (answer) {
+      if (field === 'mobile') {
+        await panel.locator('#field-answer').fill('OTP 482913');
+        await panel.getByRole('button', { name: 'Review answer' }).click();
+        await panel.getByText('Enter only the requested information.').waitFor();
+        assert.equal(await panel.locator('#field-answer').inputValue(), '');
+        assert.equal(await site.locator('#f-mobile').inputValue(), '');
+      }
       await panel.locator('#field-answer').fill(answer);
       await panel.getByRole('button', { name: 'Review answer' }).click();
     }
@@ -123,6 +130,12 @@ test('filing confirms each value and records the docket only after the user subm
     await panel.locator('#start-case').click();
     await panel.locator('#open-filing').click();
     await site.waitForURL(helpline + '/file');
+    await panel.locator('#lang').selectOption('hi');
+    await panel.getByRole('heading', { name: 'अभ्यास शिकायत दर्ज करें' }).waitFor();
+    await panel.locator('#lang').selectOption('kn');
+    await panel.getByRole('heading', { name: 'ಅಭ್ಯಾಸ ದೂರು ಸಲ್ಲಿಸಿ' }).waitFor();
+    await panel.locator('#lang').selectOption('en');
+    await panel.getByRole('heading', { name: 'File the practice complaint' }).waitFor();
     await fillComplaint(panel, site);
     await panel.getByRole('button', { name: 'Point to Submit complaint' }).waitFor();
     assert.equal(site.url(), helpline + '/file');

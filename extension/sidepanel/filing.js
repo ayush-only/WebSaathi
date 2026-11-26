@@ -30,8 +30,9 @@
     return node;
   }
 
-  function create(container, status, onReadyToSubmit) {
+  function create(container, status, onReadyToSubmit, t) {
     let activePage = null;
+    let headingText;
     let filled = new Set();
     let attempt = 0;
 
@@ -52,17 +53,19 @@
 
     function show(page, activeCase, keepDraft = false) {
       if (page?.kind !== 'file') { hide(); return; }
-      if (page.pageId === activePage && keepDraft) return;
+      const headingLabel = t('fileHeading');
+      if (page.pageId === activePage && keepDraft && headingText === headingLabel) return;
+      headingText = headingLabel;
       if (page.pageId !== activePage) filled = new Set();
       activePage = page.pageId;
       container.hidden = false;
-      const heading = element('h3', 'File the practice complaint');
+      const heading = element('h3', headingLabel);
       const next = fields.find(([label]) => !filled.has(label));
       if (!next) {
         const submit = page.controls.find((control) => control.label === 'Submit complaint');
-        container.replaceChildren(heading, element('p', 'Review the form on the page, then press Submit complaint yourself.'));
+        container.replaceChildren(heading, element('p', t('submitGuide')));
         if (submit) {
-          const spotlight = element('button', 'Point to Submit complaint', { type: 'button' });
+          const spotlight = element('button', t('pointSubmit'), { type: 'button' });
           spotlight.addEventListener('click', () => pageAction(page, submit, 'WS_HIGHLIGHT'));
           container.append(spotlight);
           pageAction(page, submit, 'WS_HIGHLIGHT');
@@ -73,26 +76,27 @@
       const [label, type] = next;
       const control = page.controls.find((item) => item.label === label && !item.disabled);
       if (!control) {
-        container.replaceChildren(heading, element('p', 'The practice form field is unavailable: ' + label));
+        container.replaceChildren(heading, element('p', t('fieldUnavailable', { field: t(label) })));
         return;
       }
       pageAction(page, control, 'WS_HIGHLIGHT');
       const candidate = caseValues(activeCase)[label];
-      const prompt = element('p', label);
+      const prompt = element('p', t(label));
       if (candidate) {
         confirm(candidate);
         return;
       }
       const input = element('input', '', { id: 'field-answer', type, required: '', autocomplete: 'off',
-        'aria-label': label, maxlength: 200 });
+        'aria-label': t(label), maxlength: 200 });
       const form = element('form');
-      form.append(input, element('button', 'Review answer', { type: 'submit' }));
+      form.append(input, element('button', t('reviewAnswer'), { type: 'submit' }));
       container.replaceChildren(heading, prompt, form);
       form.addEventListener('submit', (event) => {
         event.preventDefault();
         const value = input.value.trim();
         if (!value || WS.redact.containsSensitiveValue(value) || /[\w.-]+@[\w.-]+/.test(value)) {
-          status('Enter only the requested information.');
+          input.value = '';
+          status('onlyRequested');
           return;
         }
         confirm(value);
@@ -101,8 +105,8 @@
       function confirm(value) {
         const token = ++attempt;
         const preview = element('p', value, { id: 'proposed-value' });
-        const yes = element('button', 'Confirm fill', { id: 'confirm-fill', type: 'button' });
-        const no = element('button', 'I’ll fill it myself', { type: 'button' });
+        const yes = element('button', t('confirmFill'), { id: 'confirm-fill', type: 'button' });
+        const no = element('button', t('fillSelf'), { type: 'button' });
         container.replaceChildren(heading, prompt, preview, yes, no);
         yes.addEventListener('click', async () => {
           if (token !== attempt || activePage !== page.pageId) return;
@@ -110,7 +114,7 @@
           no.disabled = true;
           const result = await pageAction(page, control, 'WS_FILL', { label, value, confirmed: true });
           if (!result?.ok) {
-            status('WebSaathi could not fill this field. Enter it on the page.');
+            status('fillFailed');
             yes.disabled = false;
             no.disabled = false;
             return;
@@ -120,8 +124,8 @@
           show(page, activeCase);
         });
         no.addEventListener('click', () => {
-          container.replaceChildren(heading, prompt, element('p', 'Type your answer on the page, then continue here.'));
-          const done = element('button', 'Field entered', { type: 'button' });
+          container.replaceChildren(heading, prompt, element('p', t('typeOnPage')));
+          const done = element('button', t('fieldEntered'), { type: 'button' });
           done.addEventListener('click', () => { filled.add(label); show(page, activeCase); });
           container.append(done);
         });
